@@ -41,7 +41,7 @@ class Map():
                               destination=axorder)
             unit_cell = np.zeros(6, dtype='float')
             cell = file.header.cella[['x', 'y', 'z']]
-            unit_cell[:3] = cell.view(('f4', 3))
+            unit_cell[:3] = cell.astype([('x', '<f4'), ('y', '<f4'), ('z', '<f4')]).view(('<f4',3))
             unit_cell[3:] = float(90)
             self.cell = unit_cell
             self.origin = [
