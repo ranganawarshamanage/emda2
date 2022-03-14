@@ -48,7 +48,7 @@ After installation, you may check the installation by typing
 License
 =======
 
-EMDA-1.1.2 comes under Mozilla Public License Version 2.0 licence.
+EMDA-2.0.0 comes under Mozilla Public License Version 2.0 licence.
 Please look at LICENSE.txt for more details.
 
 
@@ -64,5 +64,5 @@ Acknowledgments
 
 Wellcome Trust- Validation tools for Cryo EM grant (208398/Z/17/Z)
 
-This README file was last time modified on 02.09.2020
+This README file was last time modified on 14.03.2022
 
