@@ -1,0 +1,595 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module fcodes ! in 
+    interface  ! in :fcodes
+        subroutine test ! in :fcodes:fcodes.f90
+        end subroutine test
+        subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            integer intent(in) :: mode
+            integer intent(in) :: maxbin
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            integer intent(out) :: nbin
+            real dimension(maxbin),intent(out),depend(maxbin) :: res_arr
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: bin_idx
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: s_grid
+        end subroutine resolution_grid
+        subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            integer intent(in) :: mode
+            integer intent(in) :: maxbin
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            integer intent(out) :: nbin
+            real dimension(maxbin),intent(out),depend(maxbin) :: res_arr
+            integer dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(out),depend(nz,ny,nx) :: bin_idx
+            real dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(out),depend(nz,ny,nx) :: s_grid
+        end subroutine resol_grid_em
+        subroutine resolution_grid_full(uc,highres,mode,maxbin,nx,ny,nz,resol_grid,s_grid,mask) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            real intent(in) :: highres
+            integer intent(in) :: mode
+            integer intent(in) :: maxbin
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: resol_grid
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: s_grid
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: mask
+        end subroutine resolution_grid_full
+        subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_idx,s_grid) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            real dimension(nbin),intent(in) :: res_arr
+            integer intent(in) :: mode
+            integer, optional,intent(in),check(len(res_arr)>=nbin),depend(res_arr) :: nbin=len(res_arr)
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: bin_idx
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: s_grid
+        end subroutine resolution_grid_from_given_resarr
+        subroutine make_resarr(uc,maxbin,res_arr,nbin,firststep) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            integer intent(in) :: maxbin
+            real dimension(maxbin),intent(out),depend(maxbin) :: res_arr
+            integer intent(out) :: nbin
+            real, optional,intent(in) :: firststep
+        end subroutine make_resarr
+        subroutine conv3d_to_1d(f3d,uc,nx,ny,nz,mode,f1d,resol1d) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: f3d
+            real dimension(6),intent(in) :: uc
+            integer, optional,intent(in),check((shape(f3d,0))/(1.0)==nx),depend(f3d) :: nx=(shape(f3d,0))/(1.0)
+            integer, optional,intent(in),check((shape(f3d,1))/(1.0)==ny),depend(f3d) :: ny=(shape(f3d,1))/(1.0)
+            integer, optional,intent(in),check((shape(f3d,2))/(1.0)==nz),depend(f3d) :: nz=(shape(f3d,2))/(1.0)
+            integer intent(in) :: mode
+            complex*16 dimension(nx*ny*(nz+2)/2),intent(out),depend(nx,ny,nz) :: f1d
+            real dimension(nx*ny*(nz+2)/2),intent(out),depend(nx,ny,nz) :: resol1d
+        end subroutine conv3d_to_1d
+        subroutine calc_halffsc(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz,fo,eo,bin_stats,bin_arr_count) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(in) :: hf1
+            complex*16 dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(in),depend(nz,ny,nx) :: hf2
+            integer dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(in),depend(nz,ny,nx) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,2))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,0))/(1.0)
+            complex*16 dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(out),depend(nz,ny,nx) :: fo
+            complex*16 dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(out),depend(nz,ny,nx) :: eo
+            real*8 dimension(nbin,4),intent(out),depend(nbin) :: bin_stats
+            integer dimension(nbin),intent(out),depend(nbin) :: bin_arr_count
+        end subroutine calc_halffsc
+        subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: hf1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: hf2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            real*8 dimension(nbin,2),intent(out),depend(nbin) :: binstats
+            integer dimension(nbin),intent(out),depend(nbin) :: bin_arr_count
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,0))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,2))/(1.0)
+        end subroutine calc_fsc
+        subroutine calc_fsc_using_halfmaps(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz,fo,eo,bin_noise_var,bin_sgnl_var,bin_total_var,bin_fsc,bin_arr_count) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: hf1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: hf2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,0))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: fo
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: eo
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_noise_var
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_sgnl_var
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_total_var
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_fsc
+            integer dimension(nbin),intent(out),depend(nbin) :: bin_arr_count
+        end subroutine calc_fsc_using_halfmaps
+        subroutine get_normalized_sf(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz,eo,bin_noise_var,bin_sgnl_var,bin_total_var,bin_fsc,bin_arr_count) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: hf1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: hf2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,0))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,3),intent(out),depend(nx,ny,nz) :: eo
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_noise_var
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_sgnl_var
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_total_var
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_fsc
+            integer dimension(nbin),intent(out),depend(nbin) :: bin_arr_count
+        end subroutine get_normalized_sf
+        subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,f1f2_covar,bin_fsc,bin_arr_count,nx,ny,nz) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: hf1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: hf2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            real*8 dimension(nbin),intent(out),depend(nbin) :: f1f2_covar
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_fsc
+            integer dimension(nbin),intent(out),depend(nbin) :: bin_arr_count
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,0))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,2))/(1.0)
+        end subroutine calc_covar_and_fsc_betwn_anytwomaps
+        subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid) ! in :fcodes:fcodes.f90
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: bin_idx
+            real*8 dimension(nbin),intent(in) :: bin_fsc
+            integer, optional,intent(in),check(len(bin_fsc)>=nbin),depend(bin_fsc) :: nbin=len(bin_fsc)
+            integer, optional,intent(in),check((shape(bin_idx,0))/(1.0)==nx),depend(bin_idx) :: nx=(shape(bin_idx,0))/(1.0)
+            integer, optional,intent(in),check((shape(bin_idx,1))/(1.0)==ny),depend(bin_idx) :: ny=(shape(bin_idx,1))/(1.0)
+            integer, optional,intent(in),check((shape(bin_idx,2))/(1.0)==nz),depend(bin_idx) :: nz=(shape(bin_idx,2))/(1.0)
+            real*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: fsc_weighted_grid
+        end subroutine read_into_grid
+        subroutine read_into_grid2(bin_idx,bin_fsc,nbin,nx,ny,nz,wgrid) ! in :fcodes:fcodes.f90
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: bin_idx
+            real*8 dimension(nbin,2),intent(in) :: bin_fsc
+            integer, optional,intent(in),check(shape(bin_fsc,0)==nbin),depend(bin_fsc) :: nbin=shape(bin_fsc,0)
+            integer, optional,intent(in),check((shape(bin_idx,0))/(1.0)==nx),depend(bin_idx) :: nx=(shape(bin_idx,0))/(1.0)
+            integer, optional,intent(in),check((shape(bin_idx,1))/(1.0)==ny),depend(bin_idx) :: ny=(shape(bin_idx,1))/(1.0)
+            integer, optional,intent(in),check((shape(bin_idx,2))/(1.0)==nz),depend(bin_idx) :: nz=(shape(bin_idx,2))/(1.0)
+            real*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz,2),intent(out),depend(nx,ny,nz) :: wgrid
+        end subroutine read_into_grid2
+        subroutine get_reciprocal_basis(uc,ucstar) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            real dimension(6),intent(out) :: ucstar
+        end subroutine get_reciprocal_basis
+        subroutine get_resol2(ucstar,h,k,l,resol) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: ucstar
+            real intent(in) :: h
+            real intent(in) :: k
+            real intent(in) :: l
+            real intent(out) :: resol
+        end subroutine get_resol2
+        subroutine get_resol(uc,h,k,l,resol) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            real intent(in) :: h
+            real intent(in) :: k
+            real intent(in) :: l
+            real intent(out) :: resol
+        end subroutine get_resol
+        subroutine get_st(nx,ny,nz,t,st,s1,s2,s3) ! in :fcodes:fcodes.f90
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            real*8 dimension(3),intent(in) :: t
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: st
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: s1
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: s2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: s3
+        end subroutine get_st
+        subroutine get_xyz(uc,nx,ny,nz,xyz) ! in :fcodes:fcodes.f90
+            real*8 dimension(6),intent(in) :: uc
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            real*8 dimension(1.0 * nz,1.0 * ny,1.0 * nx,3),intent(out),depend(nz,ny,nx) :: xyz
+        end subroutine get_xyz
+        subroutine fsc_weight_calculation(fsc_weighted_grid,f1,f2,bin_idx,nbin,mode,nx,ny,nz) ! in :fcodes:fcodes.f90
+            real*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: fsc_weighted_grid
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: f1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: f2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f1,0))/(1.0)==nx),depend(f1) :: nx=(shape(f1,0))/(1.0)
+            integer, optional,intent(in),check((shape(f1,1))/(1.0)==ny),depend(f1) :: ny=(shape(f1,1))/(1.0)
+            integer, optional,intent(in),check((shape(f1,2))/(1.0)==nz),depend(f1) :: nz=(shape(f1,2))/(1.0)
+        end subroutine fsc_weight_calculation
+        subroutine calc_avg_maps(all_maps,bin_idx,s_grid,wgt,bf_arr,uc,nbin,nmaps,nbf,mode,nx,ny,nz,avgmaps_all) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps),intent(in) :: all_maps
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: s_grid
+            real*8 dimension(nmaps,nmaps,nbin),intent(in),depend(nmaps,nmaps) :: wgt
+            real dimension(nbf),intent(in) :: bf_arr
+            real dimension(6),intent(in) :: uc
+            integer, optional,intent(in),check(shape(wgt,2)==nbin),depend(wgt) :: nbin=shape(wgt,2)
+            integer, optional,intent(in),check(shape(all_maps,3)==nmaps),depend(all_maps) :: nmaps=shape(all_maps,3)
+            integer, optional,intent(in),check(len(bf_arr)>=nbf),depend(bf_arr) :: nbf=len(bf_arr)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(all_maps,0))/(1.0)==nx),depend(all_maps) :: nx=(shape(all_maps,0))/(1.0)
+            integer, optional,intent(in),check((shape(all_maps,1))/(1.0)==ny),depend(all_maps) :: ny=(shape(all_maps,1))/(1.0)
+            integer, optional,intent(in),check((shape(all_maps,2))/(1.0)==nz),depend(all_maps) :: nz=(shape(all_maps,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps,nbf),intent(out),depend(nx,ny,nz,nmaps,nbf) :: avgmaps_all
+        end subroutine calc_avg_maps
+        subroutine calc_avg_maps_3d(all_maps,bin_idx,smat,fmat,tinv,bf_arr,uc,nbin,nmaps,nbf,mode,nx,ny,nz,avgmaps_all) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps),intent(in) :: all_maps
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real*8 dimension(nmaps,nmaps,nbin),intent(in),depend(nmaps,nmaps) :: smat
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps,nmaps),intent(in),depend(nx,ny,nz,nmaps,nmaps) :: fmat
+            real*8 dimension(nmaps,nmaps,nbin),intent(in),depend(nmaps,nmaps,nbin) :: tinv
+            real dimension(nbf),intent(in) :: bf_arr
+            real dimension(6),intent(in) :: uc
+            integer, optional,intent(in),check(shape(smat,2)==nbin),depend(smat) :: nbin=shape(smat,2)
+            integer, optional,intent(in),check(shape(all_maps,3)==nmaps),depend(all_maps) :: nmaps=shape(all_maps,3)
+            integer, optional,intent(in),check(len(bf_arr)>=nbf),depend(bf_arr) :: nbf=len(bf_arr)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(all_maps,0))/(1.0)==nx),depend(all_maps) :: nx=(shape(all_maps,0))/(1.0)
+            integer, optional,intent(in),check((shape(all_maps,1))/(1.0)==ny),depend(all_maps) :: ny=(shape(all_maps,1))/(1.0)
+            integer, optional,intent(in),check((shape(all_maps,2))/(1.0)==nz),depend(all_maps) :: nz=(shape(all_maps,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps,nbf),intent(out),depend(nx,ny,nz,nmaps,nbf) :: avgmaps_all
+        end subroutine calc_avg_maps_3d
+        subroutine apply_bfactor_to_map(mapin,bf_arr,uc,nx,ny,nz,nbf,mode,all_mapout) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: mapin
+            real dimension(nbf),intent(in) :: bf_arr
+            real dimension(6),intent(in) :: uc
+            integer, optional,intent(in),check((shape(mapin,0))/(1.0)==nx),depend(mapin) :: nx=(shape(mapin,0))/(1.0)
+            integer, optional,intent(in),check((shape(mapin,1))/(1.0)==ny),depend(mapin) :: ny=(shape(mapin,1))/(1.0)
+            integer, optional,intent(in),check((shape(mapin,2))/(1.0)==nz),depend(mapin) :: nz=(shape(mapin,2))/(1.0)
+            integer, optional,intent(in),check(len(bf_arr)>=nbf),depend(bf_arr) :: nbf=len(bf_arr)
+            integer intent(in) :: mode
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nbf),intent(out),depend(nx,ny,nz,nbf) :: all_mapout
+        end subroutine apply_bfactor_to_map
+        subroutine tricubic(rm,f,frs,nc,mode,nx,ny,nz) ! in :fcodes:fcodes.f90
+            real*8 dimension(3,3),intent(in) :: rm
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nc),intent(in) :: f
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nc),intent(out),depend(nx,ny,nz,nc) :: frs
+            integer, optional,intent(in),check(shape(f,3)==nc),depend(f) :: nc=shape(f,3)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f,0))/(1.0)==nx),depend(f) :: nx=(shape(f,0))/(1.0)
+            integer, optional,intent(in),check((shape(f,1))/(1.0)==ny),depend(f) :: ny=(shape(f,1))/(1.0)
+            integer, optional,intent(in),check((shape(f,2))/(1.0)==nz),depend(f) :: nz=(shape(f,2))/(1.0)
+        end subroutine tricubic
+        subroutine mtz2_3d(h,k,l,f,nobs,nx,ny,nz,f3d) ! in :fcodes:fcodes.f90
+            real dimension(nobs),intent(in) :: h
+            real dimension(nobs),intent(in),depend(nobs) :: k
+            real dimension(nobs),intent(in),depend(nobs) :: l
+            complex*16 dimension(nobs),intent(in),depend(nobs) :: f
+            integer, optional,intent(in),check(len(h)>=nobs),depend(h) :: nobs=len(h)
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: f3d
+        end subroutine mtz2_3d
+        subroutine prepare_hkl(hf1,bin_idx,cbin,nx,ny,nz,mode,h,k,l,ampli,phase) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: hf1
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: cbin
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,0))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,2))/(1.0)
+            integer intent(in) :: mode
+            integer dimension(4*cbin*cbin*cbin),intent(out),depend(cbin) :: h
+            integer dimension(4*cbin*cbin*cbin),intent(out),depend(cbin) :: k
+            integer dimension(4*cbin*cbin*cbin),intent(out),depend(cbin) :: l
+            real*8 dimension(4*cbin*cbin*cbin),intent(out),depend(cbin) :: ampli
+            real*8 dimension(4*cbin*cbin*cbin),intent(out),depend(cbin) :: phase
+        end subroutine prepare_hkl
+        subroutine prepare_hkl2(f_arr,nx,ny,nz,nmap,mode,hkl,ampli,phase) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmap),intent(in) :: f_arr
+            integer, optional,intent(in),check((shape(f_arr,0))/(1.0)==nx),depend(f_arr) :: nx=(shape(f_arr,0))/(1.0)
+            integer, optional,intent(in),check((shape(f_arr,1))/(1.0)==ny),depend(f_arr) :: ny=(shape(f_arr,1))/(1.0)
+            integer, optional,intent(in),check((shape(f_arr,2))/(1.0)==nz),depend(f_arr) :: nz=(shape(f_arr,2))/(1.0)
+            integer, optional,intent(in),check(shape(f_arr,3)==nmap),depend(f_arr) :: nmap=shape(f_arr,3)
+            integer intent(in) :: mode
+            integer dimension(nx*ny*(ny+2)/2,3),intent(out),depend(nx,ny) :: hkl
+            real*8 dimension(nx*ny*(ny+2)/2,nmap),intent(out),depend(nx,ny,nmap) :: ampli
+            real*8 dimension(nx*ny*(ny+2)/2),intent(out),depend(nx,ny) :: phase
+        end subroutine prepare_hkl2
+        subroutine prepare_hkl_bfac(s_grid,f1,f2,bfac,nx,ny,nz,nbf,mode,h,k,l,ampli,noise,phase) ! in :fcodes:fcodes.f90
+            real dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: s_grid
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: f1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: f2
+            real dimension(nbf),intent(in) :: bfac
+            integer, optional,intent(in),check((shape(s_grid,0))/(1.0)==nx),depend(s_grid) :: nx=(shape(s_grid,0))/(1.0)
+            integer, optional,intent(in),check((shape(s_grid,1))/(1.0)==ny),depend(s_grid) :: ny=(shape(s_grid,1))/(1.0)
+            integer, optional,intent(in),check((shape(s_grid,2))/(1.0)==nz),depend(s_grid) :: nz=(shape(s_grid,2))/(1.0)
+            integer, optional,intent(in),check(len(bfac)>=nbf),depend(bfac) :: nbf=len(bfac)
+            integer intent(in) :: mode
+            integer dimension(nx*ny*(ny+2)/2),intent(out),depend(nx,ny) :: h
+            integer dimension(nx*ny*(ny+2)/2),intent(out),depend(nx,ny) :: k
+            integer dimension(nx*ny*(ny+2)/2),intent(out),depend(nx,ny) :: l
+            real*8 dimension(nx*ny*(ny+2)/2,nbf),intent(out),depend(nx,ny,nbf) :: ampli
+            real*8 dimension(nx*ny*(ny+2)/2,nbf),intent(out),depend(nx,ny,nbf) :: noise
+            real*8 dimension(nx*ny*(ny+2)/2),intent(out),depend(nx,ny) :: phase
+        end subroutine prepare_hkl_bfac
+        subroutine add_random_phase_beyond(f_ori,f_all_random,bin_idx,rand_idx,nx,ny,nz,f_beyond_random) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: f_ori
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: f_all_random
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: rand_idx
+            integer, optional,intent(in),check((shape(f_ori,0))/(1.0)==nx),depend(f_ori) :: nx=(shape(f_ori,0))/(1.0)
+            integer, optional,intent(in),check((shape(f_ori,1))/(1.0)==ny),depend(f_ori) :: ny=(shape(f_ori,1))/(1.0)
+            integer, optional,intent(in),check((shape(f_ori,2))/(1.0)==nz),depend(f_ori) :: nz=(shape(f_ori,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: f_beyond_random
+        end subroutine add_random_phase_beyond
+        subroutine cutmap(fin,bin_idx,smax,mode,nbin,nx,ny,nz,fout) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fin
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: smax
+            integer intent(in) :: mode
+            integer intent(in) :: nbin
+            integer, optional,intent(in),check((shape(fin,0))/(1.0)==nx),depend(fin) :: nx=(shape(fin,0))/(1.0)
+            integer, optional,intent(in),check((shape(fin,1))/(1.0)==ny),depend(fin) :: ny=(shape(fin,1))/(1.0)
+            integer, optional,intent(in),check((shape(fin,2))/(1.0)==nz),depend(fin) :: nz=(shape(fin,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: fout
+        end subroutine cutmap
+        subroutine cutmap_arr(fin,bin_idx,smax,mode,nbin,nx,ny,nz,n,fout) ! in :fcodes:fcodes.f90
+            complex*16 dimension(n,1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fin
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: smax
+            integer intent(in) :: mode
+            integer intent(in) :: nbin
+            integer, optional,intent(in),check((shape(fin,1))/(1.0)==nx),depend(fin) :: nx=(shape(fin,1))/(1.0)
+            integer, optional,intent(in),check((shape(fin,2))/(1.0)==ny),depend(fin) :: ny=(shape(fin,2))/(1.0)
+            integer, optional,intent(in),check((shape(fin,3))/(1.0)==nz),depend(fin) :: nz=(shape(fin,3))/(1.0)
+            integer, optional,intent(in),check(shape(fin,0)==n),depend(fin) :: n=shape(fin,0)
+            complex*16 dimension(n,1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(n,nx,ny,nz) :: fout
+        end subroutine cutmap_arr
+        subroutine trilinear(rm,f,frs,ncopies,mode,nx,ny,nz) ! in :fcodes:fcodes.f90
+            real*8 dimension(3,3),intent(in) :: rm
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,ncopies),intent(in) :: f
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,ncopies),intent(out),depend(nx,ny,nz,ncopies) :: frs
+            integer, optional,intent(in),check(shape(f,3)==ncopies),depend(f) :: ncopies=shape(f,3)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f,0))/(1.0)==nx),depend(f) :: nx=(shape(f,0))/(1.0)
+            integer, optional,intent(in),check((shape(f,1))/(1.0)==ny),depend(f) :: ny=(shape(f,1))/(1.0)
+            integer, optional,intent(in),check((shape(f,2))/(1.0)==nz),depend(f) :: nz=(shape(f,2))/(1.0)
+        end subroutine trilinear
+        subroutine trilinear_new(rm,uc,f,frs,highres,nx,ny,nz) ! in :fcodes:fcodes.f90
+            real*8 dimension(3,3),intent(in) :: rm
+            real dimension(6),intent(in) :: uc
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: f
+            complex*16 dimension(1.0 * nx + 1.0,1.0 * ny + 1.0,1.0 * nz + 1.0),intent(out),depend(nx,ny,nz) :: frs
+            real intent(in) :: highres
+            integer, optional,intent(in),check((shape(f,0))/(1.0)==nx),depend(f) :: nx=(shape(f,0))/(1.0)
+            integer, optional,intent(in),check((shape(f,1))/(1.0)==ny),depend(f) :: ny=(shape(f,1))/(1.0)
+            integer, optional,intent(in),check((shape(f,2))/(1.0)==nz),depend(f) :: nz=(shape(f,2))/(1.0)
+        end subroutine trilinear_new
+        subroutine trilinear2(f,bin_idx,rm,nbin,ncopies,mode,nx,ny,nz,frs) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,ncopies),intent(in) :: f
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real*8 dimension(3,3),intent(in) :: rm
+            integer intent(in) :: nbin
+            integer, optional,intent(in),check(shape(f,3)==ncopies),depend(f) :: ncopies=shape(f,3)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f,0))/(1.0)==nx),depend(f) :: nx=(shape(f,0))/(1.0)
+            integer, optional,intent(in),check((shape(f,1))/(1.0)==ny),depend(f) :: ny=(shape(f,1))/(1.0)
+            integer, optional,intent(in),check((shape(f,2))/(1.0)==nz),depend(f) :: nz=(shape(f,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,ncopies),intent(out),depend(nx,ny,nz,ncopies) :: frs
+        end subroutine trilinear2
+        subroutine trilinearn(f,rm,ncopies,mode,nx,ny,nz,frs) ! in :fcodes:fcodes.f90
+            complex*16 dimension(ncopies,1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: f
+            real*8 dimension(ncopies,3,3),intent(in),depend(ncopies) :: rm
+            integer, optional,intent(in),check(shape(f,0)==ncopies),depend(f) :: ncopies=shape(f,0)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f,1))/(1.0)==nx),depend(f) :: nx=(shape(f,1))/(1.0)
+            integer, optional,intent(in),check((shape(f,2))/(1.0)==ny),depend(f) :: ny=(shape(f,2))/(1.0)
+            integer, optional,intent(in),check((shape(f,3))/(1.0)==nz),depend(f) :: nz=(shape(f,3))/(1.0)
+            complex*16 dimension(ncopies,1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(ncopies,nx,ny,nz) :: frs
+        end subroutine trilinearn
+        subroutine trilinear_map(rm,arr1,arr2,nx,ny,nz,mode) ! in :fcodes:fcodes.f90
+            real*8 dimension(3,3),intent(in) :: rm
+            real*8 dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(in) :: arr1
+            real*8 dimension(1.0 * nz,1.0 * ny,1.0 * nx),intent(out),depend(nz,ny,nx) :: arr2
+            integer, optional,intent(in),check((shape(arr1,2))/(1.0)==nx),depend(arr1) :: nx=(shape(arr1,2))/(1.0)
+            integer, optional,intent(in),check((shape(arr1,1))/(1.0)==ny),depend(arr1) :: ny=(shape(arr1,1))/(1.0)
+            integer, optional,intent(in),check((shape(arr1,0))/(1.0)==nz),depend(arr1) :: nz=(shape(arr1,0))/(1.0)
+            integer intent(in) :: mode
+        end subroutine trilinear_map
+        subroutine tricubic_map(rm,arr1,arr2,ncopies,mode,nx,ny,nz) ! in :fcodes:fcodes.f90
+            real*8 dimension(3,3),intent(in) :: rm
+            real*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz,ncopies),intent(in) :: arr1
+            real*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz,ncopies),intent(out),depend(nx,ny,nz,ncopies) :: arr2
+            integer, optional,intent(in),check(shape(arr1,3)==ncopies),depend(arr1) :: ncopies=shape(arr1,3)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(arr1,0))/(1.0)==nx),depend(arr1) :: nx=(shape(arr1,0))/(1.0)
+            integer, optional,intent(in),check((shape(arr1,1))/(1.0)==ny),depend(arr1) :: ny=(shape(arr1,1))/(1.0)
+            integer, optional,intent(in),check((shape(arr1,2))/(1.0)==nz),depend(arr1) :: nz=(shape(arr1,2))/(1.0)
+        end subroutine tricubic_map
+        subroutine average_intensity_in_bins(f1,f2,bin_idx,nbin,mode,nx,ny,nz,i1_mean,i2_mean) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: f1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: f2
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f1,0))/(1.0)==nx),depend(f1) :: nx=(shape(f1,0))/(1.0)
+            integer, optional,intent(in),check((shape(f1,1))/(1.0)==ny),depend(f1) :: ny=(shape(f1,1))/(1.0)
+            integer, optional,intent(in),check((shape(f1,2))/(1.0)==nz),depend(f1) :: nz=(shape(f1,2))/(1.0)
+            real*8 dimension(nbin),intent(out),depend(nbin) :: i1_mean
+            real*8 dimension(nbin),intent(out),depend(nbin) :: i2_mean
+        end subroutine average_intensity_in_bins
+        subroutine setbin(nbin,low_res,high_res,res_arr,binmode) ! in :fcodes:fcodes.f90
+            integer intent(in) :: nbin
+            real intent(in) :: low_res
+            real intent(in) :: high_res
+            real dimension(nbin),intent(out),depend(nbin) :: res_arr
+            integer intent(in) :: binmode
+        end subroutine setbin
+        subroutine binarr_1d(res_arr,resol_1d,bin_idx,nbin,nx,nref) ! in :fcodes:fcodes.f90
+            real dimension(nbin),intent(in) :: res_arr
+            real dimension(nx),intent(in) :: resol_1d
+            integer dimension(nx),intent(out),depend(nx) :: bin_idx
+            integer, optional,intent(in),check(len(res_arr)>=nbin),depend(res_arr) :: nbin=len(res_arr)
+            integer, optional,intent(in),check(len(resol_1d)>=nx),depend(resol_1d) :: nx=len(resol_1d)
+            integer dimension(nbin),intent(out),depend(nbin) :: nref
+        end subroutine binarr_1d
+        subroutine bin_data_1d(intensity,binidx_1d,nbin,nx,nmax,bindat) ! in :fcodes:fcodes.f90
+            real*8 dimension(nx),intent(in) :: intensity
+            integer dimension(nx),intent(in),depend(nx) :: binidx_1d
+            integer intent(in) :: nbin
+            integer, optional,intent(in),check(len(intensity)>=nx),depend(intensity) :: nx=len(intensity)
+            integer intent(in) :: nmax
+            real*8 dimension(nbin,nmax),intent(out),depend(nbin,nmax) :: bindat
+        end subroutine bin_data_1d
+        subroutine bin_idx_with_given_nbin(uc,nbin,res_arr,bin_idx,nx,ny,nz,binmode) ! in :fcodes:fcodes.f90
+            real dimension(6),intent(in) :: uc
+            integer intent(in) :: nbin
+            real dimension(nbin),intent(out),depend(nbin) :: res_arr
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nx
+            integer intent(in) :: ny
+            integer intent(in) :: nz
+            integer intent(in) :: binmode
+        end subroutine bin_idx_with_given_nbin
+        subroutine apply_bin_scale(mapin,bin_idx,bin_scale,nbins,nmaps,nx,ny,nz,mode,all_mapout) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps),intent(in) :: mapin
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real dimension(nbins),intent(in) :: bin_scale
+            integer, optional,intent(in),check(len(bin_scale)>=nbins),depend(bin_scale) :: nbins=len(bin_scale)
+            integer, optional,intent(in),check(shape(mapin,3)==nmaps),depend(mapin) :: nmaps=shape(mapin,3)
+            integer, optional,intent(in),check((shape(mapin,0))/(1.0)==nx),depend(mapin) :: nx=(shape(mapin,0))/(1.0)
+            integer, optional,intent(in),check((shape(mapin,1))/(1.0)==ny),depend(mapin) :: ny=(shape(mapin,1))/(1.0)
+            integer, optional,intent(in),check((shape(mapin,2))/(1.0)==nz),depend(mapin) :: nz=(shape(mapin,2))/(1.0)
+            integer intent(in) :: mode
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nmaps),intent(out),depend(nx,ny,nz,nmaps) :: all_mapout
+        end subroutine apply_bin_scale
+        subroutine calc_power_spectrum(fo,bin_idx,nbin,mode,nx,ny,nz,bin_total_var) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fo
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            integer intent(in) :: nbin
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(fo,0))/(1.0)==nx),depend(fo) :: nx=(shape(fo,0))/(1.0)
+            integer, optional,intent(in),check((shape(fo,1))/(1.0)==ny),depend(fo) :: ny=(shape(fo,1))/(1.0)
+            integer, optional,intent(in),check((shape(fo,2))/(1.0)==nz),depend(fo) :: nz=(shape(fo,2))/(1.0)
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_total_var
+        end subroutine calc_power_spectrum
+        subroutine calc_derivatives(e0,e1,wgrid,w2grid,sv,dfrs,drdq,xyz_sum,vol,nx,ny,nz,df,ddf) ! in :fcodes:fcodes.f90
+            complex*16 dimension(nx,ny,nz),intent(in) :: e0
+            complex*16 dimension(nx,ny,nz),intent(in),depend(nx,ny,nz) :: e1
+            real*8 dimension(nx,ny,nz),intent(in),depend(nx,ny,nz) :: wgrid
+            real*8 dimension(nx,ny,nz),intent(in),depend(nx,ny,nz) :: w2grid
+            real*8 dimension(nx,ny,nz,3),intent(in),depend(nx,ny,nz) :: sv
+            complex*16 dimension(nx,ny,nz,3),intent(in),depend(nx,ny,nz) :: dfrs
+            real*8 dimension(3,3,3),intent(in) :: drdq
+            real*8 dimension(6),intent(in) :: xyz_sum
+            real*8 intent(in) :: vol
+            integer, optional,intent(in),check(shape(e0,0)==nx),depend(e0) :: nx=shape(e0,0)
+            integer, optional,intent(in),check(shape(e0,1)==ny),depend(e0) :: ny=shape(e0,1)
+            integer, optional,intent(in),check(shape(e0,2)==nz),depend(e0) :: nz=shape(e0,2)
+            real*8 dimension(6),intent(out) :: df
+            real*8 dimension(6,6),intent(out) :: ddf
+        end subroutine calc_derivatives
+        subroutine calc_derivatives2(e0,e1,wgrid,w2grid,sv,dfrs,drdq,dqda,xyz_sum,vol,nx,ny,nz,df,ddf) ! in :fcodes:fcodes.f90
+            complex*16 dimension(nx,ny,nz),intent(in) :: e0
+            complex*16 dimension(nx,ny,nz),intent(in),depend(nx,ny,nz) :: e1
+            real*8 dimension(nx,ny,nz),intent(in),depend(nx,ny,nz) :: wgrid
+            real*8 dimension(nx,ny,nz),intent(in),depend(nx,ny,nz) :: w2grid
+            real*8 dimension(nx,ny,nz,3),intent(in),depend(nx,ny,nz) :: sv
+            complex*16 dimension(nx,ny,nz,3),intent(in),depend(nx,ny,nz) :: dfrs
+            real*8 dimension(3,3,3),intent(in) :: drdq
+            real*8 dimension(3),intent(in) :: dqda
+            real*8 dimension(6),intent(in) :: xyz_sum
+            real*8 intent(in) :: vol
+            integer, optional,intent(in),check(shape(e0,0)==nx),depend(e0) :: nx=shape(e0,0)
+            integer, optional,intent(in),check(shape(e0,1)==ny),depend(e0) :: ny=shape(e0,1)
+            integer, optional,intent(in),check(shape(e0,2)==nz),depend(e0) :: nz=shape(e0,2)
+            real*8 dimension(6),intent(out) :: df
+            real*8 dimension(6,6),intent(out) :: ddf
+        end subroutine calc_derivatives2
+        subroutine differencemap(fo,fc,bin_idx,res_arr,smax,mode,nbin,nx,ny,nz,diffmap) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fo
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: fc
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real dimension(nbin),intent(in) :: res_arr
+            real intent(in) :: smax
+            integer intent(in) :: mode
+            integer, optional,intent(in),check(len(res_arr)>=nbin),depend(res_arr) :: nbin=len(res_arr)
+            integer, optional,intent(in),check((shape(fo,0))/(1.0)==nx),depend(fo) :: nx=(shape(fo,0))/(1.0)
+            integer, optional,intent(in),check((shape(fo,1))/(1.0)==ny),depend(fo) :: ny=(shape(fo,1))/(1.0)
+            integer, optional,intent(in),check((shape(fo,2))/(1.0)==nz),depend(fo) :: nz=(shape(fo,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,4),intent(out),depend(nx,ny,nz) :: diffmap
+        end subroutine differencemap
+        subroutine diffmap_norm(fo,fc,bin_idx,res_arr,smax,mode,nbin,nx,ny,nz,diffmap) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fo
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: fc
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real dimension(nbin),intent(in) :: res_arr
+            real intent(in) :: smax
+            integer intent(in) :: mode
+            integer, optional,intent(in),check(len(res_arr)>=nbin),depend(res_arr) :: nbin=len(res_arr)
+            integer, optional,intent(in),check((shape(fo,0))/(1.0)==nx),depend(fo) :: nx=(shape(fo,0))/(1.0)
+            integer, optional,intent(in),check((shape(fo,1))/(1.0)==ny),depend(fo) :: ny=(shape(fo,1))/(1.0)
+            integer, optional,intent(in),check((shape(fo,2))/(1.0)==nz),depend(fo) :: nz=(shape(fo,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,4),intent(out),depend(nx,ny,nz) :: diffmap
+        end subroutine diffmap_norm
+        subroutine scalesigmafval(hf1,hf2,fc,bin_idx,res_arr,nbin,mode,nx,ny,nz,fo,scale_d,sigma,bin_noise_var,fval) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: hf1
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: hf2
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: fc
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real dimension(nbin) :: res_arr
+            integer, optional,intent(in),check(len(res_arr)>=nbin),depend(res_arr) :: nbin=len(res_arr)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(hf1,0))/(1.0)==nx),depend(hf1) :: nx=(shape(hf1,0))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,1))/(1.0)==ny),depend(hf1) :: ny=(shape(hf1,1))/(1.0)
+            integer, optional,intent(in),check((shape(hf1,2))/(1.0)==nz),depend(hf1) :: nz=(shape(hf1,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: fo
+            real*8 dimension(nbin),intent(out),depend(nbin) :: scale_d
+            real*8 dimension(nbin),intent(out),depend(nbin) :: sigma
+            real*8 dimension(nbin),intent(out),depend(nbin) :: bin_noise_var
+            real*8 intent(out) :: fval
+        end subroutine scalesigmafval
+        subroutine scalesigmafval_full(fo,fc,bin_idx,res_arr,mode,nbin,nx,ny,nz,scale_d,sigma,totalvar,fval) ! in :fcodes:fcodes.f90
+            complex*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fo
+            complex*8 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: fc
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real dimension(nbin),intent(in) :: res_arr
+            integer intent(in) :: mode
+            integer, optional,intent(in),check(len(res_arr)>=nbin),depend(res_arr) :: nbin=len(res_arr)
+            integer, optional,intent(in),check((shape(fo,0))/(1.0)==nx),depend(fo) :: nx=(shape(fo,0))/(1.0)
+            integer, optional,intent(in),check((shape(fo,1))/(1.0)==ny),depend(fo) :: ny=(shape(fo,1))/(1.0)
+            integer, optional,intent(in),check((shape(fo,2))/(1.0)==nz),depend(fo) :: nz=(shape(fo,2))/(1.0)
+            real*8 dimension(nbin),intent(out),depend(nbin) :: scale_d
+            real*8 dimension(nbin),intent(out),depend(nbin) :: sigma
+            real*8 dimension(nbin),intent(out),depend(nbin) :: totalvar
+            real*8 intent(out) :: fval
+        end subroutine scalesigmafval_full
+        subroutine tricubic_zoom(scale,f,frs,nc,mode,nx,ny,nz) ! in :fcodes:fcodes.f90
+            real intent(in) :: scale
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nc),intent(in) :: f
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz,nc),intent(out),depend(nx,ny,nz,nc) :: frs
+            integer, optional,intent(in),check(shape(f,3)==nc),depend(f) :: nc=shape(f,3)
+            integer intent(in) :: mode
+            integer, optional,intent(in),check((shape(f,0))/(1.0)==nx),depend(f) :: nx=(shape(f,0))/(1.0)
+            integer, optional,intent(in),check((shape(f,1))/(1.0)==ny),depend(f) :: ny=(shape(f,1))/(1.0)
+            integer, optional,intent(in),check((shape(f,2))/(1.0)==nz),depend(f) :: nz=(shape(f,2))/(1.0)
+        end subroutine tricubic_zoom
+        subroutine ll_derivatives(fo,fc,bin_idx,d,totalvar,mode,nbin,nx,ny,nz,dll,ddll) ! in :fcodes:fcodes.f90
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in) :: fo
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: fc
+            integer dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(in),depend(nx,ny,nz) :: bin_idx
+            real*8 dimension(nbin),intent(in) :: d
+            real*8 dimension(nbin),intent(in),depend(nbin) :: totalvar
+            integer intent(in) :: mode
+            integer, optional,intent(in),check(len(d)>=nbin),depend(d) :: nbin=len(d)
+            integer, optional,intent(in),check((shape(fo,0))/(1.0)==nx),depend(fo) :: nx=(shape(fo,0))/(1.0)
+            integer, optional,intent(in),check((shape(fo,1))/(1.0)==ny),depend(fo) :: ny=(shape(fo,1))/(1.0)
+            integer, optional,intent(in),check((shape(fo,2))/(1.0)==nz),depend(fo) :: nz=(shape(fo,2))/(1.0)
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: dll
+            complex*16 dimension(1.0 * nx,1.0 * ny,1.0 * nz),intent(out),depend(nx,ny,nz) :: ddll
+        end subroutine ll_derivatives
+    end interface 
+end python module fcodes
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
