@@ -1,4 +1,4 @@
-EMDA version 1.1.3
+EMDA version 2.0.0
 ===================
 
 EMDA is an importable Python library for Electron Microscopy map and model manipulations written in Python3.
@@ -28,7 +28,7 @@ All dependencies will be automatically checked and installed, if necessary durin
 EMDA installation.
 
 
-Installing EMDA version 1.1.3 
+Installing EMDA version 2.0.0 
 ===============================
 
 For installation you may need administrator permissions, 
