@@ -9,7 +9,6 @@ Mozilla Public License, version 2.0; see LICENSE.
 # local correlation in real space
 
 from __future__ import absolute_import, division, print_function, unicode_literals
-from os import name
 import numpy as np
 import emda2.core as core
 import emda2.emda_methods2 as em
@@ -163,7 +162,6 @@ class RealspaceLocalCC:
 
 def get_3d_realspcorrelation(half1, half2, kern, mask=None):
     import scipy.signal
-    from scipy.stats import mode
 
     loc3_A = scipy.signal.fftconvolve(half1, kern, "same")
     loc3_A2 = scipy.signal.fftconvolve(half1 * half1, kern, "same")
