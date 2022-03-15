@@ -9,8 +9,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 import emda2.core as core
 import numpy as np
-import fcodes2
-from emda.config import *
+from emda2.config import *
 
 
 def lowpassmap_ideal(fc, bin_idx, cbin):
