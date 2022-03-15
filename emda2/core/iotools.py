@@ -206,8 +206,6 @@ def resample_on_anothermap(uc1, uc2, arr1, arr2):
 
 
 def padimage(arr, tdim):
-    import emda.emda_methods as em
-
     if len(tdim) == 3:
         tnx, tny, tnz = tdim
     elif len(tdim) < 3:
