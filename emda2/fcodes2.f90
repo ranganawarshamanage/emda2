@@ -2965,6 +2965,65 @@ subroutine calc_power_spectrum(Fo,bin_idx,nbin,mode,nx,ny,nz,bin_total_var)
   if(debug) print*, 'time for calculation(s) = ', finish-start
 end subroutine calc_power_spectrum
 
+subroutine radial_profile(arr,bin_idx,nbin,mode,nx,ny,nz,radprof)
+  implicit none
+  integer, intent(in) :: nbin,mode,nx,ny,nz
+  real, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: arr
+  integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in) :: bin_idx
+  real, dimension(0:nbin-1),intent(out) :: radprof
+  ! locals
+  integer,   dimension(3)          :: nxyz
+  integer,   dimension(0:nbin-1) :: bin_arr_count
+  real*8,    dimension(0:nbin-1) :: A_sum
+  !
+  real*8     :: A,B
+  real       :: start,finish
+  integer    :: i,j,k,xyzmin(3),xyzmax(3),ibin
+  logical    :: debug,make_all_zero
+  !
+  debug         = .FALSE.
+  make_all_zero = .FALSE.
+  if(mode == 1) debug = .TRUE.
+  call cpu_time(start)
+
+  radprof = 0.0
+  A_sum = 0.0
+
+
+  bin_arr_count = 0
+  xyzmin = 0; xyzmax = 0
+  nxyz = (/ nx, ny, nz /)
+
+  xyzmin(1) = int(-nxyz(1)/2)
+  xyzmin(2) = int(-nxyz(2)/2)
+  xyzmin(3) = int(-nxyz(3)/2)
+  xyzmax    = -(xyzmin+1)
+  !if(debug) print*, 'Use only hemisphere data'
+  !if(debug) print*, 'xyzmin = ', xyzmin
+  !if(debug) print*, 'xyzmax = ', xyzmax(1),xyzmax(2),0
+
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), xyzmax(3)
+           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+           bin_arr_count(bin_idx(i,j,k)) = bin_arr_count(bin_idx(i,j,k)) + 1   
+           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+           A_sum(bin_idx(i,j,k)) = A_sum(bin_idx(i,j,k)) + arr(i,j,k)
+        end do
+     end do
+  end do
+
+  do ibin=0, nbin-1 !to make compatible with python arrays
+     radprof(ibin) = A_sum(ibin)/bin_arr_count(ibin)
+     if(debug)then
+        print*,ibin,radprof(ibin),bin_arr_count(ibin)
+     end if
+  end do
+
+  call cpu_time(finish)
+  if(debug) print*, 'time for calculation(s) = ', finish-start
+end subroutine radial_profile
+
 subroutine calc_derivatives(e0,e1,wgrid,w2grid,sv,dFRS,dRdq,xyz_sum,vol,nx,ny,nz,df,ddf)
   implicit none
   real*8, parameter :: PI = 3.141592653589793
