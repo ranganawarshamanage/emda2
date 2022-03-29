@@ -34,7 +34,6 @@ def halfmaps_fsc_variance(hf1, hf2, bin_idx, nbin):
 def anytwomaps_fsc_covariance(f1, f2, bin_idx, nbin):
     assert f1.shape == f2.shape
     nx, ny, nz = f1.shape
-    print(np.max(bin_idx), np.min(bin_idx))
     binstats, bin_arr_count = fcodes2.calc_fsc(
         f1, f2, bin_idx, nbin, debug_mode, nx, ny, nz
     )
