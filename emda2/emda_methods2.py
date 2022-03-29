@@ -575,6 +575,46 @@ def overlay(arrlist, pixlist, cell, origin, nocom=False, optmethod=None, tlist=N
             tlist=tlist, qlist=qlist, ncycles=100, fitres=fitres, optmethod=optmethod)
     return emmap1, rotmat_list, trans_list
 
+def refine_magnification():
+    pass
+
+def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None):
+    """
+    Inputs:
+        m1: Map object made with iotools.Map()
+        axis: rotation axis of the map (output from Proshade)
+        symorder: symmetry order of the rotation axis
+        fitres: highest resolution for refinement. default to 6 A.
+        fitfsc: threshold FSC for deciding resolution level for the refinement
+                default to 0.5
+        fobj: object for logfile output
+        t_init: initial translation vector to apply. default to x=0, y=0, z0
+
+    Outputs:
+        initial_ax: same as input axis, but normalised
+        final_ax: refined rotation axis
+        final_t = refined translation (in fractional units as output by EMDA)
+    """
+    from emda2.ext import axis_refinement
+
+    emmap1 = axis_refinement.EmmapOverlay(arr=m1.workarr)
+    emmap1.map_unit_cell = m1.workcell
+    emmap1.prep_data()
+    if t_init is None:
+        t_init = [0.0, 0.0, 0.0]
+    initial_ax, final_ax, final_t = axis_refinement.axis_refine(
+        emmap1=emmap1,
+        rotaxis=axis,
+        symorder=symorder,
+        fitres=fitres,
+        fitfsc=fitfsc,
+        ncycles=10,
+        fobj=fobj,
+        t_init=t_init,
+    )
+    return initial_ax, final_ax, final_t
+
+
 
 if __name__=="__main__":
     imap = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_trimmed.mrc"
