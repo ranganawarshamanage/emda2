@@ -174,6 +174,24 @@ def mask_from_map(
         arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
     return mask, arrlp
 
+def mask_from_map_connectedpixels(m1, binthresh=None):
+    """
+    This method generates a mask from a given map based on their
+    pixel connectivity. Connectivity is searched on a lowpass map to 
+    15 A. 
+    
+    Inputs:
+        m1: map object from EMDA2.
+        binthresh: binarisation threshold for lowpass map. default is
+            max_density_value * 0.1
+    
+    Outputs:
+        mask: generated mask as an ndarray
+    """
+    from emda2.ext.mapmask import mapmask_connectedpixels
+    mask, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
+    return mask
+
 def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=None, res_arr=None):
     """Lowpass filters a map to a specified resolution.
 
