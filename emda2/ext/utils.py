@@ -172,3 +172,55 @@ def get_ibin(bin_fsc, cutoff):
                 ibin = ibin - 1
             break
     return ibin
+
+def rebox2cube(arr):
+    nx, ny, nz = arr.shape
+    maxdim = np.max(arr.shape)
+    if maxdim % 2 != 0:
+        maxdim += 1
+    dx = (maxdim - nx) // 2
+    dy = (maxdim - ny) // 2
+    dz = (maxdim - nz) // 2
+    newarr  = np.zeros((maxdim, maxdim, maxdim), 'float')
+    newarr[dx:dx+nx, dy:dy+ny, dz:dz+nz] = arr
+    return newarr
+
+def to_cube(arr, padwidth=10, rad=None):
+    """
+    Returns a cubic array.
+
+    Inputs:
+        arr: ndarray of the map
+        rad: int, half legnth (in pixels) of the box to be created.
+            if not given, helf of the length of the given box is taken
+        padwidth: int, number of pixels to be padded. default to 10
+
+    Outputs:
+        newarr: reboxed array
+    """
+    arrshape = np.array(arr.shape, 'int')
+    if np.sum(arrshape - np.amax(arrshape)) != 0:
+        arr = rebox2cube(arr)
+    nx, ny, nz = arr.shape
+    if rad is None:
+        rad = nx // 2
+    if rad <= 0:
+        raise SystemExit("rad CANNOT BE negative or zero!")
+    assert rad <= nx//2
+    x1 = y1 = z1 = nx//2 - rad
+    x2 = y2 = z2 = x1 + 2*rad
+    dimz = z2 - z1
+    dimy = y2 - y1
+    dimx = x2 - x1
+    dim = np.max([dimz, dimy, dimx])
+    if dim % 2 != 0:
+        dim += 1
+    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    dx = (dim - dimx) // 2
+    dy = (dim - dimy) // 2
+    dz = (dim - dimz) // 2
+    dx += padwidth
+    dy += padwidth
+    dz += padwidth
+    newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
+    return newarr
