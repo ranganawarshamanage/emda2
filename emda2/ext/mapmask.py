@@ -1,8 +1,6 @@
 import emda2.emda_methods2 as em
 import numpy as np
-import fcodes2 as fc
 import sys, re
-from emda2.ext.filters import median_filter, difference_filter, mean_filter
 from emda2.core import iotools, maptools
 
 
@@ -23,7 +21,7 @@ def globular_mask(arr, radius=None, com=False):
     else:
         center = [nx//2, ny//2, nz//2]
     # Creating a sphere mask
-    print("boxsize: ", box_size, "boxradius: ", box_radius, "center:", center)
+    #print("boxsize: ", box_size, "boxradius: ", box_radius, "center:", center)
     #radius = box_radius
     X, Y, Z = np.ogrid[:nx, :ny, :nz]
     dist_from_center = np.sqrt(
@@ -42,42 +40,6 @@ def binary_dilation(binary_arr, size=5):
     from scipy.ndimage.morphology import binary_dilation
     selem = np.ones((size, size, size), 'int')
     newarr = binary_dilation(binary_arr, structure=selem, iterations=1)
-    return newarr
-
-def make_cubic(arr):
-    nz, ny, nx = arr.shape
-    print(arr.shape)
-    maxdim = np.max(arr.shape)
-    if maxdim % 2 != 0:
-        maxdim += 1
-    dz = (maxdim - nz) // 2
-    dy = (maxdim - ny) // 2
-    dx = (maxdim - nx) // 2
-    newarr  = np.zeros((maxdim, maxdim, maxdim), 'float')
-    newarr[dz:dz+nz, dy:dy+ny, dx:dx+nx] = arr
-    return newarr
-
-def rebox2cube(arr, rad, padwidth=10):
-    nx, ny, nz = arr.shape
-    rad =  rad + (nx // 2 - rad)//2
-    assert rad <= nx//2
-    x1 = y1 = z1 = nx//2 - rad
-    x2 = y2 = z2 = x1 + 2*rad
-    dimz = z2 - z1
-    dimy = y2 - y1
-    dimx = x2 - x1
-    dim = np.max([dimz, dimy, dimx])
-    if dim % 2 != 0:
-        dim += 1
-    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
-    print((dim - dimz), (dim - dimy), (dim - dimx))
-    dz = (dim - dimz) // 2
-    dy = (dim - dimy) // 2
-    dx = (dim - dimx) // 2
-    dz += padwidth
-    dy += padwidth
-    dx += padwidth
-    newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
     return newarr
 
 def mapmask_connectedpixels(m1, binary_threshold=None):
@@ -113,7 +75,7 @@ def main(imap):
     #pltname = m.group(1) + "_rad.eps"
     m1 = iotools.Map(name=imap)
     m1.read()
-    mask, lwp = create_mapmask_islandlabelling(m1=m1)
+    mask, lwp = mapmask_connectedpixels(m1=m1)
     mout = iotools.Map(name=maskname)
     mout.arr = mask
     mout.cell = m1.workcell
