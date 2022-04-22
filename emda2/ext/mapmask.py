@@ -47,7 +47,7 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
     _, lwp = em.lowpass_map(uc=m1.workcell, arr1=m1.workarr, resol=15, filter="butterworth")
     lwp = (lwp - np.mean(lwp)) / np.std(lwp)
     if binary_threshold is None:
-        binary_threshold = np.amax(lwp) / 10
+        binary_threshold = np.amax(lwp) / 20
     arr = lwp > binary_threshold
     blobs = arr
     radius = max(blobs.shape) // 2
@@ -68,15 +68,16 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
     nmask = binary_dilation(nmask)
     return nmask, arr
 
-def main(imap):
-    maskname = imap[:-4] + "_mapmask.mrc"
+def main(imap, imask=None):
+    if imask is None:
+        imask = imap[:-4] + "_mapmask.mrc"
     #m = re.search('emd_(.+?).map', imap)
     #maskname = m.group(1) + "_mapmask.mrc"
     #pltname = m.group(1) + "_rad.eps"
     m1 = iotools.Map(name=imap)
     m1.read()
     mask, lwp = mapmask_connectedpixels(m1=m1)
-    mout = iotools.Map(name=maskname)
+    mout = iotools.Map(name=imask)
     mout.arr = mask
     mout.cell = m1.workcell
     mout.origin = m1.origin
