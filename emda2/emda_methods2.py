@@ -179,7 +179,7 @@ def mask_from_map_connectedpixels(m1, binthresh=None):
     This method generates a mask from a given map based on their
     pixel connectivity. Connectivity is searched on a lowpass map to 
     15 A. 
-    
+
     Inputs:
         m1: map object from EMDA2.
         binthresh: binarisation threshold for lowpass map. default is
@@ -596,7 +596,7 @@ def overlay(arrlist, pixlist, cell, origin, nocom=False, optmethod=None, tlist=N
 def refine_magnification():
     pass
 
-def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None):
+def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None, res_arr=None, bin_idx=None, nbin=None):
     """
     Inputs:
         m1: Map object made with iotools.Map()
@@ -617,6 +617,9 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
 
     emmap1 = axis_refinement.EmmapOverlay(arr=m1.workarr)
     emmap1.map_unit_cell = m1.workcell
+    emmap1.bin_idx = bin_idx
+    emmap1.res_arr = res_arr
+    emmap1.nbin = nbin
     emmap1.prep_data()
     if t_init is None:
         t_init = [0.0, 0.0, 0.0]
@@ -632,6 +635,52 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
     )
     return initial_ax, final_ax, final_t
 
+def rebox_by_mask(arr, mask, padwidth=10):
+    """
+    Rebox a map using provided mask
+
+    Inputs:
+        arr: ndarray, map to rebox
+        mask: ndarra, mask for reboxing
+
+    Outputs:
+        reboxed_map: ndarray, reboxed map
+        reboxed_mask: ndarray, reboxed mask
+    """
+    from emda2.ext.utils import rebox_using_mask
+    reboxed_map, reboxed_mask = rebox_using_mask(
+        arr=arr, 
+        mask=mask, 
+        padwidth=padwidth)
+    return reboxed_map, reboxed_mask
+
+def get_pointgroup(axlist, orderlist, m1, resol=5.0, fsclim=0.7, fobj=None):
+    """
+    Find point group in EMDA using proshade axes and sym.order lists
+
+    Inputs:
+        axlist: list of rotation axes output by Proshade
+        orderlist: list of symmetry orders correspond with axes in axlist
+        m1: mapobject from EMDA/iotools.Map
+        resol: max. resolution for axis refinement and pointgroup detection
+        fobj: file object for output information
+
+    Outputs:
+        pg: point group symbol
+    """
+    from emda2.ext.sym import pointgroup
+    results = pointgroup.get_pg(
+        axis_list=axlist, 
+        orderlist=orderlist, 
+        m1=m1, 
+        resol=resol, 
+        fobj=fobj, 
+        fsc_cutoff=fsclim)
+    if len(results) > 0:
+        pg, gen_odrlist, gen_axlist = results
+    else:
+        pg = None
+    return pg
 
 
 if __name__=="__main__":
