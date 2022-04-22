@@ -8,6 +8,8 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import emda2.core as core
+from emda2.core import iotools, maptools
+import emda2.emda_methods2 as em
 import numpy as np
 import fcodes2 as fc
 from emda2.config import *
@@ -138,18 +140,22 @@ def cut_resolution_for_linefit(f_list, bin_idx, res_arr, smax):
 
 def determine_ibin(bin_fsc, cutoff=0.15):
     bin_fsc = filter_fsc(bin_fsc)
+    #print('filtered FSC:')
+    #print(bin_fsc)
     ibin = get_ibin(bin_fsc, cutoff)        
-    i = 0
+    """ i = 0
     while ibin < 5:
         cutoff -= 0.01
         ibin = get_ibin(bin_fsc, max([cutoff, 0.1]))
         i += 1
         if i > 100:
+            print('ibin: ', ibin)
             print("Fit starting configurations are too far.")
             raise SystemExit()
     if ibin == 0:
+        print('ibin: ', 0)
         print("Fit starting configurations are too far.")
-        raise SystemExit()
+        raise SystemExit() """
     return ibin
 
 def filter_fsc(bin_fsc, thresh=0.05):
@@ -171,6 +177,7 @@ def get_ibin(bin_fsc, cutoff):
             if ibin % 2 != 0:
                 ibin = ibin - 1
             break
+    #print('get_ibin, ibin: ', ibin)
     return ibin
 
 def rebox2cube(arr):
@@ -185,7 +192,7 @@ def rebox2cube(arr):
     newarr[dx:dx+nx, dy:dy+ny, dz:dz+nz] = arr
     return newarr
 
-def to_cube(arr, padwidth=10, rad=None):
+def rebox_using_radius(arr, padwidth=10, rad=None):
     """
     Returns a cubic array.
 
@@ -224,3 +231,52 @@ def to_cube(arr, padwidth=10, rad=None):
     dz += padwidth
     newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
     return newarr
+
+def rebox_using_mask(arr, mask, padwidth=10):
+    mask = mask * (mask > 1.e-5)
+    i, j, k = np.nonzero(mask)
+    z2, y2, x2 = np.max(i), np.max(j), np.max(k)
+    z1, y1, x1 = np.min(i), np.min(j), np.min(k)
+    dimz = z2 - z1
+    dimy = y2 - y1
+    dimx = x2 - x1
+    dim = np.max([dimz, dimy, dimx])
+    if dim % 2 != 0:
+        dim += 1
+    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    newmask = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    print((dim - dimz), (dim - dimy), (dim - dimx))
+    dz = (dim - dimz) // 2
+    dy = (dim - dimy) // 2
+    dx = (dim - dimx) // 2
+    dz += padwidth
+    dy += padwidth
+    dx += padwidth
+    newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
+    newmask[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = mask[z1:z2, y1:y2, x1:x2]
+    return newarr, newmask
+
+def rebox_using_model(imap, model):
+    """
+    Reboxes map using a coordinate generated mask.
+    This includes following steps:
+    1. generate mask from model
+    2. rebox map using that mask
+    3. rebox model using that mask
+
+    Inputs:
+        imap: mapname
+        model: modelname
+
+    Outputs:
+        reboxed_arr: ndarray, reboxed map
+        reboxed_mask: ndarray, reboxed mask
+        reboxed_model: revoxed model 'emda_reboxed_model.cif' is output
+    """
+    mm = em.mask_from_atomic_model(mapname=imap, modelname=model)
+    m1 = iotools.Map(name=imap)
+    m1.read()
+    reboxed_arr, reboxed_mask = rebox_using_mask(arr=m1.workarr, mask=mm.arr)
+    # model rebox
+    maptools.model_rebox(mask=mm.arr, mmcif_file=model, uc=m1.cell)
+    return reboxed_arr, reboxed_mask
