@@ -105,11 +105,11 @@ def map_output(arrlist, axis, angle, translation, mask=None):
     from emda2.ext.utils import center_of_mass_density, shift_density, rotate_f
 
     # output lists
-    original_centered_maps = []
-    transformed_maps = []
+    f_original_centered = []
+    f_transformed = []
     axis = np.asarray(axis)
     axis = axis / math.sqrt(np.dot(axis, axis))
-    q = quaternions.get_quaternion([list(axis), angle])
+    q = quaternions.get_quaternion(list(axis), angle)
     rotmat = quaternions.get_RM(q)
     arr1 = arr2 = None
     if mask is not None:
@@ -117,34 +117,80 @@ def map_output(arrlist, axis, angle, translation, mask=None):
     else:
         mask = 1.
     if len(arrlist) == 2:
-        arr1 = arr1 * mask
-        arr2 = arr2 * mask
-        arr = (arr1 + arr2)
+        arr1 = arrlist[0] * mask
+        arr2 = arrlist[1] * mask
+        arr = (arr1 + arr2) / 2
     elif len(arrlist) == 1:
-        arr = arr * mask
-    com = center_of_mass_density(arr)
-    print('com: ', com)
+        arr = arrlist[0] * mask
     nx, ny, nz = arr.shape
+    com = center_of_mass_density(arr)    
     box_centr = (nx // 2, ny // 2, nz // 2)
     arr = shift_density(arr, np.subtract(box_centr, com))
-    original_centered_maps.append(arr)
     fo = fftshift(fftn(fftshift(arr)))
+    f_original_centered.append(fo)
     st = fc.get_st(nx, ny, nz, translation)[0]
     frt = rotate_f(rotmat, fo * st, interp="linear")[:, :, :, 0]
-    data2write = np.real(ifftshift(ifftn(ifftshift(frt))))
-    transformed_maps.append(data2write)
+    f_transformed.append(frt)
     if arr1 is not None:
         arr1 = shift_density(arr1, np.subtract(box_centr, com))
         arr2 = shift_density(arr2, np.subtract(box_centr, com))
-        original_centered_maps.append(arr1)
-        original_centered_maps.append(arr2)
         fo1 = fftshift(fftn(fftshift(arr1)))
         fo2 = fftshift(fftn(fftshift(arr2)))
+        f_original_centered.append(fo1)
+        f_original_centered.append(fo2)
         st = fc.get_st(nx, ny, nz, translation)[0]
         frt1 = rotate_f(rotmat, fo1 * st, interp="linear")[:, :, :, 0]
         frt2 = rotate_f(rotmat, fo2 * st, interp="linear")[:, :, :, 0]
-        data2write1 = np.real(ifftshift(ifftn(ifftshift(frt1))))
-        data2write2 = np.real(ifftshift(ifftn(ifftshift(frt2))))
-        transformed_maps.append(data2write1)
-        transformed_maps.append(data2write2) 
-    return original_centered_maps, transformed_maps
+        f_transformed.append(frt1)
+        f_transformed.append(frt2)
+    return f_original_centered, f_transformed
+
+
+def map_transform(flist, axis, angle, translation):
+    """
+    This function returns rotated and translated copies of input maps
+    in arrlist.
+    Inputs:
+        arrlist: list of ndarrays (maps)
+            The same transformation will be applied on all maps.
+        axis: rotation axis about which the maps are rotated. axis is normalised
+            before being used.
+        angle: angle by which the maps are rotated. 
+            Note that angle should be given in Degrees. 
+        translation: translation vector for maps.
+            Note that translation should be given in fractionals 
+            (direct output of EMDA axis refinement).
+    
+    Outputs:
+        original_centered_maps: list of inputmaps centered at the center of box
+            order of maps - fullmap, [halfmap1, halfmap2]
+        transformed_maps: list of transformed maps
+            order of maps - fullmap, [halfmap1, halfmap2]
+    """
+    import math
+    import fcodes2 as fc
+    from emda2.core import quaternions
+    from emda2.ext.utils import rotate_f
+
+    f_transformed = []
+    axis = np.asarray(axis)
+    axis = axis / math.sqrt(np.dot(axis, axis))
+    q = quaternions.get_quaternion(list(axis), angle)
+    rotmat = quaternions.get_RM(q)
+    f1 = f2 = None
+    if len(flist) == 1:
+        fo = flist[0]
+    elif len(flist) == 2:
+        f1 = flist[0]
+        f2 = flist[1]
+        fo = (f1 + f2) / 2
+    nx, ny, nz = fo.shape
+    st = fc.get_st(nx, ny, nz, translation)[0]
+    frt = rotate_f(rotmat, fo * st, interp="linear")[:, :, :, 0]
+    f_transformed.append(frt)
+    if f1 is not None:
+        frt1 = rotate_f(rotmat, f1 * st, interp="linear")[:, :, :, 0]
+        frt2 = rotate_f(rotmat, f2 * st, interp="linear")[:, :, :, 0]
+        f_transformed.append(frt1)
+        f_transformed.append(frt2)
+    return f_transformed
