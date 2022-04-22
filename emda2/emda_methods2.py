@@ -663,7 +663,7 @@ def get_pointgroup(axlist, orderlist, m1, resol=5.0, fsclim=0.7, fobj=None):
         orderlist: list of symmetry orders correspond with axes in axlist
         m1: mapobject from EMDA/iotools.Map
         resol: max. resolution for axis refinement and pointgroup detection
-        fobj: file object for output information
+        fobj: file object for information output 
 
     Outputs:
         pg: point group symbol
