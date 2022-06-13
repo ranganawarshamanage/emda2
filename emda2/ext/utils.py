@@ -28,12 +28,10 @@ def lowpassmap_butterworth(fc, sgrid, smax, order=4):
     if not np.iscomplexobj(fc):
         fc = np.fft.fftshift(np.fft.fftn(fc))
     order = 4  # order of the butterworth filter
-    B = 1.0
     D = sgrid
     d = 1.0 / smax # smax in Ansgtrom units
-    bwfilter = 1.0 / (
-        1 + B * ((D / d) ** (2 * order))
-    )  # calculate the butterworth filter
+    # butterworth filter
+    bwfilter = 1.0 / np.sqrt(1 + ((D / d) ** (2 * order)))
     fmap = fc * bwfilter
     lwpmap = np.real(np.fft.ifftn(np.fft.ifftshift(fmap)))
     return fmap, lwpmap
