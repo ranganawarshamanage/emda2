@@ -278,3 +278,6 @@ def rebox_using_model(imap, model):
     # model rebox
     maptools.model_rebox(mask=mm.arr, mmcif_file=model, uc=m1.cell)
     return reboxed_arr, reboxed_mask
+
+def vec2string(vec):
+    return " ".join(("% .3f"%x for x in vec))
