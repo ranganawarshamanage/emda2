@@ -56,13 +56,37 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
     blobs_labels, nlabels = measure.label(blobs, background=0, connectivity=blobs.ndim, return_num=True)
     #print('blob assignment done')
     regionprops = measure.regionprops(blobs_labels)
-    bvol = 0
+    """ bvol = 0
     for i in range(nlabels):
         if bvol < regionprops[i].area:
             bvol = regionprops[i].area
             largest_blob = i
         else:
-            continue
+            continue """
+    # new code 16 June 2022
+    blob_number = []
+    blob_area = []
+    bsum = 0
+    for i in range(nlabels):
+        blob_number.append(i)
+        blob_area.append(regionprops[i].area)
+        bsum += regionprops[i].area
+
+    from more_itertools import sort_together
+    sblob_area, sblob_number = sort_together([blob_area, blob_number], reverse=True)
+    bnum_highvol = []
+    bsum_highvol = []
+    for i in range(nlabels):
+        vol_frac = sblob_area[i]/bsum
+        if vol_frac >= 0.05:
+            bnum_highvol.append(sblob_number[i])
+            xx = lwp * (blobs_labels == sblob_number[i])
+            bsum_highvol.append(np.sum(xx))
+            print(sblob_number[i], sblob_area[i], np.sum(xx), vol_frac, np.sum(xx)*vol_frac)
+    sbsum_highvol, sbnum_highvol = sort_together([bsum_highvol, bnum_highvol], reverse=True)
+    largest_blob = sbnum_highvol[0]
+    print('Desired blob number: ',largest_blob)
+    # new code ends
     mask = blobs * (blobs_labels == largest_blob+1)
     nmask = binary_closing(mask * gmask)
     nmask = binary_dilation(nmask)
