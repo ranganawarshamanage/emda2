@@ -109,7 +109,9 @@ def decide_pointgroup(axeslist, orderlist):
     elif len(uniqorder) == 2:
         if np.any(uniqorder == 2):
             odr2 = dic[2]
-            if np.any(uniqorder == 3):
+            if np.any(uniqorder == 1):
+                point_group = 'C2'
+            elif np.any(uniqorder == 3):
                 odr3 = dic[3]  # get all 3-fold axes locations
                 if len(odr3) == 1:
                     print("Ckecking for D symmetry...")
