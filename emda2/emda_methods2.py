@@ -620,10 +620,13 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
     emmap1.bin_idx = bin_idx
     emmap1.res_arr = res_arr
     emmap1.nbin = nbin
+    emmap1.map_dim = m1.workarr.shape
+    emmap1.map_unit_cell = m1.workcell
+    emmap1.pix = [m1.workcell[i]/sh for i, sh in enumerate(m1.workarr.shape)]
     emmap1.prep_data()
     if t_init is None:
         t_init = [0.0, 0.0, 0.0]
-    initial_ax, final_ax, final_t = axis_refinement.axis_refine(
+    initial_ax, final_ax, final_t, ax_pos = axis_refinement.axis_refine(
         emmap1=emmap1,
         rotaxis=axis,
         symorder=symorder,
@@ -633,7 +636,7 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
         fobj=fobj,
         t_init=t_init,
     )
-    return initial_ax, final_ax, final_t
+    return initial_ax, final_ax, final_t, ax_pos
 
 def rebox_by_mask(arr, mask, padwidth=10):
     """
