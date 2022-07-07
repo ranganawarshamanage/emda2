@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
+import enum
 import itertools
 from timeit import default_timer as timer
 import numpy as np
@@ -13,7 +14,8 @@ from emda2.ext.utils import (
     cut_resolution_for_linefit,
     determine_ibin,
     get_ibin,
-    filter_fsc
+    filter_fsc,
+    vec2string
 )
 import fcodes2 as fc
 from emda2.core import fsctools
@@ -31,6 +33,7 @@ class EmmapOverlay:
         self.res_arr = None
         self.bin_idx = None
         self.fo_lst = []
+        self.pix = None
 
     def prep_data(self):
         com = center_of_mass_density(self.arr)
@@ -47,6 +50,7 @@ class EmmapOverlay:
             self.fo_lst.append(fftshift(fftn(fftshift(self.arr))))
         if any(itm is None for itm in [self.bin_idx, self.nbin, self.res_arr]):
             if self.map_unit_cell is not None:
+                self.pix = [self.map_unit_cell[i]/sh for i, sh in enumerate(self.map_dim)]
                 self.nbin, self.res_arr, self.bin_idx, _ = restools.get_resolution_array(
                     self.map_unit_cell, self.fo_lst[0]
                 )
@@ -343,6 +347,9 @@ def run_fit(
                     ibin_old = ibin
                     q = q_init
                     print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
+                else:
+                    print('Resolution= %s (A)' %emmap1.res_arr[ibin])
+                    print('FSC between two copies is too low. FSC= %s ibin=%s' %(f1f2_fsc[ibin], ibin))
             else:
                 f1f2_fsc = fsc_between_static_and_transfomed_map(
                     emmap1.fo_lst[0],
@@ -410,13 +417,26 @@ def run_fit(
             else:
                 is_abandon = True
                 print("ibin = %s, Cannot proceed axis refinement." %(ibin))
-                final_axis = axis_ini
-                final_t = t
+                fobj.write("ibin = %s, Cannot proceed axis refinement. \n" %(ibin))
+                final_axis = []
+                final_t = []
+                pos_ax = []
                 break
         if fobj is not None and not is_abandon:
-            fobj.write("resol: %4.2f angle: %4.2f axini: %s FSCini: %4.3f axfnl: %s FSCfnl: %4.3f \n" %
-            (resol_fsc, np.rad2deg(angle), axis_ini, afsc_ini, final_axis, afsc_fnl))
-        return final_axis, final_t
+            #fobj.write("resol: %4.2f angle: %4.2f axini: %s FSCini: %4.3f axfnl: %s FSCfnl: %4.3f \n" %
+            #(resol_fsc, np.rad2deg(angle), axis_ini, afsc_ini, final_axis, afsc_fnl))
+            fobj.write('   Refined axis: %s   Order: %s   FSC: % .3f @ % .2f A\n' %
+                (vec2string(final_axis), int(360/np.rad2deg(angle)), afsc_fnl, resol_fsc))
+            if emmap1.com:
+                if emmap1.com1 is None:
+                    emmap1.com1 = center_of_mass_density(emmap1.arr)
+                pos_ax = [(emmap1.com1[i] + final_t[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
+                fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
+            else:
+                emmap1.com1 = [emmap1.map_dim[i]//2 for i in range(3)]
+                pos_ax = [(emmap1.com1[i] + final_t[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
+                fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
+        return final_axis, final_t, pos_ax
     except Exception as e:
         raise e
 
@@ -450,7 +470,7 @@ def axis_refine(
     #fobj.write("   " + str(axis) + str(angle) + "\n")
     q = quaternions.get_quaternion(axis, angle)
     rotmat_init = quaternions.get_RM(q)
-    final_axis, final_trans = run_fit(
+    final_axis, final_trans, axis_position = run_fit(
         emmap1=emmap1,
         rotmat=rotmat_init,
         t=np.asarray(t_init, dtype="float"),
@@ -459,7 +479,7 @@ def axis_refine(
         fitfsc=fitfsc,
         nmarchingcycles=ncycles
     )
-    return initial_axis, final_axis, final_trans
+    return initial_axis, final_axis, final_trans, axis_position
 
 
 if __name__ == "__main__":
