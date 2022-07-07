@@ -20,8 +20,14 @@ def get_symmops_from_proshade(mapname, fobj=None):
     """ Set up the run """
     ps.task = proshade.Symmetry
     ps.verbose = -1;                      
-    ps.setResolution(8.0)                  
+    #ps.setResolution(8.0)                  
     ps.addStructure(mapname)
+    # new settings from Michal
+    ps.setResolution                                ( 8.0 )
+    ps.setMapResolutionChange                       ( True )
+    ps.setMapCentering                              ( True )
+    ps.setSymmetryCentreSearch                      ( False )
+    #
     #ps.usePhase = False # to get the phaseless rotation function.
     """ Run ProSHADE """
     rn = proshade.ProSHADE_run ( ps )
@@ -65,7 +71,7 @@ def get_symmops_from_proshade(mapname, fobj=None):
                 ) 
             fobj.write("Proshade pointgroup %s\n" %proshade_pg) 
                 
-        fold, x, y, z, theta, peakh = [], [], [], [], [], []
+        fold, x, y, z, theta, peakh, afsc = [], [], [], [], [], [], []
         for row in recSymmetryAxes:
             fold.append(int(row[0]))
             x.append(row[1])
@@ -73,7 +79,8 @@ def get_symmops_from_proshade(mapname, fobj=None):
             z.append(row[3])
             theta.append(row[4])
             peakh.append(row[5])
-        return [fold, x, y, z, peakh, proshade_pg]
+            afsc.append(row[6])
+        return [fold, x, y, z, peakh, proshade_pg, afsc]
     else:
         return []
 
@@ -82,9 +89,10 @@ def process_proshade_results(proshade_results):
     axis_list, orderlist = [], []
     nrecords = len(proshade_results[0])
     orderlist = proshade_results[0]
+    fsclist = proshade_results[-1]
     x = proshade_results[1]
     y = proshade_results[2]
     z = proshade_results[3]
     for i in range(nrecords):
         axis_list.append([x[i], y[i], z[i]])
-    return axis_list, orderlist
+    return axis_list, orderlist, fsclist
