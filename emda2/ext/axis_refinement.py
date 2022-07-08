@@ -312,6 +312,8 @@ def run_fit(
         fitbin = len(emmap1.res_arr) - 1
     fsc_lst = []
     is_abandon = False
+    final_axis = axis_ini
+    final_t = t
     try:
         for i in range(nmarchingcycles):
             if i == 0:
@@ -329,8 +331,6 @@ def run_fit(
                     afsc_fnl = afsc_ini = np.average(f1f2_fsc[:fitbin])
                     resol_fsc = emmap1.res_arr[fitbin]
                     rotmat = rotmat
-                    final_axis = axis_ini
-                    final_t = t
                     print("\n***FSC between static and moving maps***\n")
                     print("bin#     resolution(A)      start-FSC     end-FSC\n")
                     for j in range(len(emmap1.res_arr)):
@@ -363,8 +363,8 @@ def run_fit(
                 ibin = get_ibin(filter_fsc(f1f2_fsc), cutoff=fitfsc)
                 if fitbin < ibin:
                     ibin = fitbin
-                if ibin_old == ibin:
-                    fsc_lst.append(f1f2_fsc)
+                if ibin_old >= ibin:
+                    fsc_lst.append(f1f2_fsc_old)
                     res_arr = emmap1.res_arr[:ibin_old]
                     fsc_bef = fsc_lst[0][:ibin_old]
                     fsc_aft = fsc_lst[1][:ibin_old]
@@ -387,9 +387,12 @@ def run_fit(
                         plot_title="FSC based on Symmetry axis", 
                         fscline=1.,
                         mapname="fsc_axis.eps")
+                    final_axis = final_axis_previous
+                    final_t = final_t_previous
                     break
                 else:
                     ibin_old = ibin
+                    f1f2_fsc_old = f1f2_fsc
                     print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
             if ibin >= 5:
                 e_list = [emmap1.fo_lst[0]]
@@ -412,7 +415,9 @@ def run_fit(
                 t = -bfgs.t
                 q = quaternions.get_quaternion(list(current_axis), bfgs.angle)
                 rotmat = quaternions.get_RM(q)
+                final_axis_previous = final_axis
                 final_axis = current_axis
+                final_t_previous = final_t
                 final_t = t
             else:
                 is_abandon = True
@@ -423,19 +428,17 @@ def run_fit(
                 pos_ax = []
                 break
         if fobj is not None and not is_abandon:
-            #fobj.write("resol: %4.2f angle: %4.2f axini: %s FSCini: %4.3f axfnl: %s FSCfnl: %4.3f \n" %
-            #(resol_fsc, np.rad2deg(angle), axis_ini, afsc_ini, final_axis, afsc_fnl))
-            fobj.write('   Refined axis: %s   Order: %s   FSC: % .3f @ % .2f A\n' %
-                (vec2string(final_axis), int(360/np.rad2deg(angle)), afsc_fnl, resol_fsc))
+            #fobj.write('   Refined axis: %s   Order: %s   FSC: % .3f @ % .2f A\n' %
+            #    (vec2string(final_axis), int(360/np.rad2deg(angle)), afsc_fnl, resol_fsc))
             if emmap1.com:
                 if emmap1.com1 is None:
                     emmap1.com1 = center_of_mass_density(emmap1.arr)
                 pos_ax = [(emmap1.com1[i] + final_t[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
-                fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
+                #fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
             else:
                 emmap1.com1 = [emmap1.map_dim[i]//2 for i in range(3)]
                 pos_ax = [(emmap1.com1[i] + final_t[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
-                fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
+                #fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
         return final_axis, final_t, pos_ax
     except Exception as e:
         raise e
