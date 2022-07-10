@@ -326,6 +326,7 @@ def run_fit(
                     cell=emmap1.map_unit_cell,
                     nbin=emmap1.nbin,
                 )
+                f1f2_fsc_old = f1f2_fsc
                 fsc_lst.append(f1f2_fsc)
                 if fitfsc > 0.999:
                     afsc_fnl = afsc_ini = np.average(f1f2_fsc[:fitbin])
@@ -341,6 +342,7 @@ def run_fit(
                         )
                     break
                 ibin = determine_ibin(bin_fsc=f1f2_fsc)
+                ibin_old = ibin
                 if ibin >= 5:
                     if fitbin < ibin:
                         ibin = fitbin
@@ -363,7 +365,29 @@ def run_fit(
                 ibin = get_ibin(filter_fsc(f1f2_fsc), cutoff=fitfsc)
                 if fitbin < ibin:
                     ibin = fitbin
-                if ibin_old >= ibin:
+                if ibin_old == ibin:
+                    fsc_lst.append(f1f2_fsc)
+                    res_arr = emmap1.res_arr[:ibin]
+                    fsc_bef = fsc_lst[0][:ibin]
+                    fsc_aft = fsc_lst[1][:ibin]
+                    print("\n***FSC between static and moving maps***\n")
+                    print("bin#     resolution(A)      start-FSC     end-FSC\n")
+                    for j in range(len(res_arr)):
+                        print(
+                            "{:5d} {:6.2f} {:8.4f} {:8.4f}".format(
+                                j, res_arr[j], fsc_bef[j], fsc_aft[j]
+                            )
+                        )
+                    print("Plotting FSCs...")
+                    plotter.plot_nlines(
+                        res_arr=res_arr, 
+                        list_arr=[fsc_lst[0][:ibin_old], fsc_lst[1][:ibin_old]], 
+                        curve_label=["Proshade axis", "EMDA axis"], 
+                        plot_title="FSC based on Symmetry axis", 
+                        fscline=1.,
+                        mapname="fsc_axis.eps")
+                    break
+                elif ibin_old > ibin:
                     fsc_lst.append(f1f2_fsc_old)
                     res_arr = emmap1.res_arr[:ibin_old]
                     fsc_bef = fsc_lst[0][:ibin_old]
