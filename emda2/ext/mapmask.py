@@ -68,9 +68,11 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
     blob_area = []
     bsum = 0
     for i in range(nlabels):
-        blob_number.append(i)
+        blob_number.append(i+1)
         blob_area.append(regionprops[i].area)
         bsum += regionprops[i].area
+        #sm = np.sum(blobs_labels == i+1)
+        #print(i, regionprops[i].area, sm)
 
     from more_itertools import sort_together
     sblob_area, sblob_number = sort_together([blob_area, blob_number], reverse=True)
@@ -81,13 +83,16 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
         if vol_frac >= 0.05:
             bnum_highvol.append(sblob_number[i])
             xx = lwp * (blobs_labels == sblob_number[i])
-            bsum_highvol.append(np.sum(xx))
-            print(sblob_number[i], sblob_area[i], np.sum(xx), vol_frac, np.sum(xx)*vol_frac)
+            #xx = xx * (xx > 10e-5)
+            #print(np.amin(xx), np.amax(xx))
+            bsum1 = np.sum(xx)
+            bsum_highvol.append(bsum1)
+            print(sblob_number[i], sblob_area[i], bsum1, vol_frac, bsum1*vol_frac)
     sbsum_highvol, sbnum_highvol = sort_together([bsum_highvol, bnum_highvol], reverse=True)
     largest_blob = sbnum_highvol[0]
     print('Desired blob number: ',largest_blob)
     # new code ends
-    mask = blobs * (blobs_labels == largest_blob+1)
+    mask = blobs * (blobs_labels == largest_blob)#+1)
     nmask = binary_closing(mask * gmask)
     nmask = binary_dilation(nmask)
     return nmask, arr
@@ -106,11 +111,11 @@ def main(imap, imask=None):
     mout.cell = m1.workcell
     mout.origin = m1.origin
     mout.write()
-    """ mout = iotools.Map(name='lwp.mrc')
+    mout = iotools.Map(name='lwp.mrc')
     mout.arr = lwp
     mout.cell = m1.workcell
     mout.origin = m1.origin
-    mout.write() """
+    mout.write()
 
 
 if __name__=="__main__":
