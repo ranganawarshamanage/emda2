@@ -685,6 +685,16 @@ def get_pointgroup(axlist, orderlist, m1, resol=5.0, fsclim=0.7, fobj=None):
         pg = None
     return pg
 
+def flip_arr(arr, axis='z'):
+    # axis to flip
+    try:
+        if axis == 'x': ax = 0
+        if axis == 'y': ax = 1
+        if axis == 'z': ax = 2
+        return np.flip(m=arr, axis=ax)
+    except Exception as e:
+        raise e
+
 
 if __name__=="__main__":
     imap = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_trimmed.mrc"
