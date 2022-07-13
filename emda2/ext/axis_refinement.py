@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-import enum
+import traceback
 import itertools
 from timeit import default_timer as timer
 import numpy as np
@@ -144,146 +144,6 @@ def fsc_between_static_and_transfomed_map(
         staticmap, frt_full, bin_idx, nbin)[0]
     return f1f2_fsc
 
-#def run_fit(
-#    emmap1,
-#    rotmat,
-#    t,
-#    ifit=0,
-#    fitfsc=0.5,
-#    nmarchingcycles=10,
-#    fobj=None,
-#    fitres=None,
-#):
-#    q_init = quaternions.rot2quart(rotmat)
-#    axis_ang = quaternions.quart2axis(q_init)
-#    axis_ini = axis_ang[:3]
-#    angle = axis_ang[-1]
-#    if fitres is not None:
-#        if fitres <= emmap1.res_arr[-1]:
-#            fitbin = len(emmap1.res_arr) - 1
-#        else:
-#            dist = np.sqrt((emmap1.res_arr - fitres) ** 2)
-#            ibin = np.argmin(dist)
-#            if ibin % 2 != 0:
-#                ibin = ibin - 1
-#            fitbin = min([len(dist), ibin])
-#    if fitres is None:
-#        fitbin = len(emmap1.res_arr) - 1
-#    fsc_lst = []
-#    for i in range(nmarchingcycles):
-#        if i == 0:
-#            f1f2_fsc = fsc_between_static_and_transfomed_map(
-#                staticmap=emmap1.fo_lst[0],
-#                movingmap=emmap1.fo_lst[0],
-#                bin_idx=emmap1.bin_idx,
-#                rm=rotmat,
-#                t=t,
-#                cell=emmap1.map_unit_cell,
-#                nbin=emmap1.nbin,
-#            )
-#            fsc_lst.append(f1f2_fsc)
-#            if fitfsc > 0.999:
-#                rotmat = rotmat
-#                final_axis = axis_ini
-#                print("\n***FSC between static and moving maps***\n")
-#                print("bin#     resolution(A)      start-FSC     end-FSC\n")
-#                for j in range(len(emmap1.res_arr)):
-#                    print(
-#                        "{:5d} {:6.2f} {:8.4f} {:8.4f}".format(
-#                            j, emmap1.res_arr[j], fsc_lst[0][j], fsc_lst[0][j]
-#                        )
-#                    )
-#                break
-#            ibin = determine_ibin(bin_fsc=f1f2_fsc)
-#            if fitbin < ibin:
-#                ibin = fitbin
-#            ibin_old = ibin
-#            q = q_init
-#            print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
-#        else:
-#            # Apply initial rotation and translation to calculate fsc
-#            f1f2_fsc = fsc_between_static_and_transfomed_map(
-#                emmap1.fo_lst[0],
-#                emmap1.fo_lst[ifit],
-#                emmap1.bin_idx,
-#                rotmat,
-#                t,
-#                emmap1.map_unit_cell,
-#                emmap1.nbin,
-#            )          
-#            ibin = get_ibin(filter_fsc(f1f2_fsc), cutoff=fitfsc)
-#            if fitbin < ibin:
-#                ibin = fitbin
-#            if ibin_old == ibin:
-#                fsc_lst.append(f1f2_fsc)
-#                res_arr = emmap1.res_arr[:ibin_old]
-#                fsc_bef = fsc_lst[0][:ibin_old]
-#                fsc_aft = fsc_lst[1][:ibin_old]
-#                print("\n***FSC between static and moving maps***\n")
-#                print("bin#     resolution(A)      start-FSC     end-FSC\n")
-#                for j in range(len(res_arr)):
-#                    print(
-#                        "{:5d} {:6.2f} {:8.4f} {:8.4f}".format(
-#                            j, res_arr[j], fsc_bef[j], fsc_aft[j]
-#                        )
-#                    )
-#                print("Plotting FSCs...")
-#                plotter.plot_nlines(
-#                    res_arr=res_arr, 
-#                    list_arr=[fsc_lst[0][:ibin_old], fsc_lst[1][:ibin_old]], 
-#                    curve_label=["Proshade axis", "EMDA axis"], 
-#                    plot_title="FSC based on Symmetry axis", 
-#                    fscline=1.,
-#                    mapname="fsc_axis.eps")
-#                break
-#            else:
-#                ibin_old = ibin
-#                print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
-#        if ibin == 0:
-#            print("ibin = 0, Cannot proceed! Stopping current axis refinement.")
-#            fobj.write(
-#                "ibin = 0, Cannot proceed! Stopping current axis refinement.\n")
-#            break
-#        e_list = [emmap1.fo_lst[0]]
-#        fcut, cBIdx, cbin = cut_resolution_for_linefit(
-#            e_list, emmap1.bin_idx, emmap1.res_arr, ibin
-#        )
-#        static_cutmap = fcut[0, :, :, :]  # use Fo for fitting.
-#        # test output for debug
-#        """ nx, ny, nz = static_cutmap.shape
-#        print('t: ', t)
-#        st, _, _, _ = fc.get_st(nx, ny, nz, t)
-#        st = 1.
-#        moving_map = rotate_f(rotmat, static_cutmap * st, interp="linear")[:, :, :, 0]
-#        stmap = np.real(ifftshift(ifftn(ifftshift(static_cutmap))))
-#        mvmap = np.real(ifftshift(ifftn(ifftshift(moving_map))))
-#        ms = iotools.Map(name='staticmap.mrc')
-#        ms.arr = stmap
-#        ms.cell = emmap1.map_unit_cell
-#        ms.write()
-#        mm = iotools.Map(name='movingmap.mrc')
-#        mm.arr = mvmap
-#        mm.cell = emmap1.map_unit_cell
-#        mm.write()  """       
-#        #
-#        bfgs = Bfgs()
-#        if i == 0:
-#            bfgs.ax_init = np.asarray(axis_ini, 'float')
-#        else:
-#            bfgs.ax_init = current_axis
-#        bfgs.angle = float(np.rad2deg(angle))
-#        bfgs.e0 = static_cutmap
-#        bfgs.bin_idx = cBIdx
-#        bfgs.nbin = cbin
-#        bfgs.method = 'nelder-mead'
-#        bfgs.optimize()
-#        current_axis = bfgs.ax_final
-#        t = -bfgs.t
-#        q = quaternions.get_quaternion(list(current_axis), bfgs.angle)
-#        rotmat = quaternions.get_RM(q)
-#    final_axis = current_axis
-#    final_t = t
-#    return final_axis, final_t
 
 def run_fit(
     emmap1,
@@ -463,9 +323,10 @@ def run_fit(
                 emmap1.com1 = [emmap1.map_dim[i]//2 for i in range(3)]
                 pos_ax = [(emmap1.com1[i] + final_t[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
                 #fobj.write("   Position of the refined axis [x, y, z] (A): %s\n" %vec2string(pos_ax))
-        return final_axis, final_t, pos_ax
-    except Exception as e:
-        raise e
+        return [final_axis, final_t, pos_ax]
+    except:
+        fobj.write(traceback.format_exc())
+        
 
 
 def axis_refine(
@@ -482,22 +343,14 @@ def axis_refine(
     initial_axis = axis = axis / math.sqrt(np.dot(axis, axis))
     print(" ")
     print("Initial axis and fold: ", axis, symorder)
-    #if fobj is None:
-    #    fobj = open("EMDA_symref.txt", "w")
-    #fobj.write("Initial axis and fold: " + str(axis) + str(symorder) + "\n")
     print("Number of refinement cycles:", ncycles)
     print("Data resolution for refinement: ", fitres)
-    #fobj.write("Number of refinement cycles: " + str(ncycles) + "\n")
-    #fobj.write("Data resolution for refinement: " + str(fitres) + "\n")
     print("Initial axis and angles:")
-    #fobj.write("Initial axis and angles: \n")
-
     angle = float(360.0 / symorder)
     print("   ", axis, angle)
-    #fobj.write("   " + str(axis) + str(angle) + "\n")
     q = quaternions.get_quaternion(axis, angle)
     rotmat_init = quaternions.get_RM(q)
-    final_axis, final_trans, axis_position = run_fit(
+    results = run_fit(
         emmap1=emmap1,
         rotmat=rotmat_init,
         t=np.asarray(t_init, dtype="float"),
@@ -506,7 +359,8 @@ def axis_refine(
         fitfsc=fitfsc,
         nmarchingcycles=ncycles
     )
-    return initial_axis, final_axis, final_trans, axis_position
+    #final_axis, final_trans, axis_position = results
+    return results
 
 
 if __name__ == "__main__":
