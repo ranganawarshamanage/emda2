@@ -606,6 +606,19 @@ def run_fit(
                             j, emmap1.res_arr[j], fsc_lst[0][j], fsc_lst[1][j]
                         )
                     )
+                # output fitted_map
+                static_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(emmap1.fo_lst[0]))))
+                fitted_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(frt))))
+                mo = iotools.Map("fitted_map.mrc")
+                mo.arr = fitted_map
+                mo.cell = emmap1.map_unit_cell
+                mo.origin = emmap1.map_origin
+                mo.write()
+                ms = iotools.Map("static_map.mrc")
+                ms.arr = static_map
+                ms.cell = emmap1.map_unit_cell
+                ms.origin = emmap1.map_origin
+                ms.write()
                 break
             else:
                 ibin_old = ibin
@@ -645,18 +658,7 @@ def run_fit(
             slf = min([ibin, 100])
             rfit.optimizer(ncycles, t, rotmat, ifit, smax_lf=slf, fobj=fobj)   
             static_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(rfit.e0))))
-            fitted_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(rfit.ert))))
-            # output fitted_map
-            mo = iotools.Map("fitted_map_intermediate.mrc")
-            mo.arr = fitted_map
-            mo.cell = emmap1.map_unit_cell
-            mo.origin = emmap1.map_origin
-            mo.write()
-            ms = iotools.Map("static_map_intermediate.mrc")
-            ms.arr = static_map
-            ms.cell = emmap1.map_unit_cell
-            ms.origin = emmap1.map_origin
-            ms.write()     
+            fitted_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(rfit.ert))))     
         else:
             rfit = run_bfgs(mapobj=emmap1, optmethod=optmethod)
             static_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(rfit.e0))))
