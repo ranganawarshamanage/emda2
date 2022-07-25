@@ -146,7 +146,7 @@ def map_output(arrlist, axis, angle, translation, mask=None):
     return f_original_centered, f_transformed
 
 
-def map_transform(flist, axis, angle, translation):
+def transform_f(flist, axis, angle, translation):
     """
     This function returns rotated and translated copies of input maps
     in arrlist.
@@ -186,11 +186,11 @@ def map_transform(flist, axis, angle, translation):
         fo = (f1 + f2) / 2
     nx, ny, nz = fo.shape
     st = fc.get_st(nx, ny, nz, translation)[0]
-    frt = rotate_f(rotmat, fo * st, interp="linear")[:, :, :, 0]
+    frt =  st * rotate_f(rotmat, fo, interp="linear")[:, :, :, 0]
     f_transformed.append(frt)
     if f1 is not None:
-        frt1 = rotate_f(rotmat, f1 * st, interp="linear")[:, :, :, 0]
-        frt2 = rotate_f(rotmat, f2 * st, interp="linear")[:, :, :, 0]
+        frt1 = st * rotate_f(rotmat, f1, interp="linear")[:, :, :, 0]
+        frt2 = st * rotate_f(rotmat, f2, interp="linear")[:, :, :, 0]
         f_transformed.append(frt1)
         f_transformed.append(frt2)
     return f_transformed
