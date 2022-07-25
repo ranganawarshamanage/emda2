@@ -56,14 +56,6 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
     blobs_labels, nlabels = measure.label(blobs, background=0, connectivity=blobs.ndim, return_num=True)
     #print('blob assignment done')
     regionprops = measure.regionprops(blobs_labels)
-    """ bvol = 0
-    for i in range(nlabels):
-        if bvol < regionprops[i].area:
-            bvol = regionprops[i].area
-            largest_blob = i
-        else:
-            continue """
-    # new code 16 June 2022
     blob_number = []
     blob_area = []
     bsum = 0
@@ -71,51 +63,48 @@ def mapmask_connectedpixels(m1, binary_threshold=None):
         blob_number.append(i+1)
         blob_area.append(regionprops[i].area)
         bsum += regionprops[i].area
-        #sm = np.sum(blobs_labels == i+1)
-        #print(i, regionprops[i].area, sm)
 
     from more_itertools import sort_together
     sblob_area, sblob_number = sort_together([blob_area, blob_number], reverse=True)
     bnum_highvol = []
     bsum_highvol = []
+    rmsd_list = []
     for i in range(nlabels):
         vol_frac = sblob_area[i]/bsum
         if vol_frac >= 0.05:
             bnum_highvol.append(sblob_number[i])
-            xx = lwp * (blobs_labels == sblob_number[i])
-            #xx = xx * (xx > 10e-5)
-            #print(np.amin(xx), np.amax(xx))
-            bsum1 = np.sum(xx)
-            bsum_highvol.append(bsum1)
-            print(sblob_number[i], sblob_area[i], bsum1, vol_frac, bsum1*vol_frac)
-    sbsum_highvol, sbnum_highvol = sort_together([bsum_highvol, bnum_highvol], reverse=True)
-    largest_blob = sbnum_highvol[0]
-    print('Desired blob number: ',largest_blob)
-    # new code ends
-    mask = blobs * (blobs_labels == largest_blob)#+1)
-    nmask = binary_closing(mask * gmask)
-    nmask = binary_dilation(nmask)
-    return nmask, arr
+            xx = m1.workarr * (blobs_labels == sblob_number[i])
+            bsum_highvol.append(np.sum(xx))
+            rmsd = np.sqrt(np.mean((xx - np.mean(xx))**2))
+            rmsd_list.append(rmsd)
+            print(sblob_number[i], np.sum(xx), vol_frac, rmsd)
+    srmsd_list, sbnum_highvol = sort_together([rmsd_list, bnum_highvol], reverse=True)
+    mask_list = []
+    from emda2.ext.maskmap_class import make_soft
+    for num in sbnum_highvol:
+        mask = blobs * (blobs_labels == num)
+        nmask = binary_closing(mask * gmask)
+        nmask = binary_dilation(nmask) 
+        nmask = make_soft(nmask, 3)
+        mask_list.append(nmask)    
+    return mask_list, lwp
 
 def main(imap, imask=None):
     if imask is None:
         imask = imap[:-4] + "_mapmask.mrc"
-    #m = re.search('emd_(.+?).map', imap)
-    #maskname = m.group(1) + "_mapmask.mrc"
-    #pltname = m.group(1) + "_rad.eps"
     m1 = iotools.Map(name=imap)
     m1.read()
-    mask, lwp = mapmask_connectedpixels(m1=m1)
+    masklist, lwp = mapmask_connectedpixels(m1=m1)
     mout = iotools.Map(name=imask)
-    mout.arr = mask
+    mout.arr = masklist[0]
     mout.cell = m1.workcell
     mout.origin = m1.origin
-    mout.write()
-    mout = iotools.Map(name='lwp.mrc')
+    mout.write()    
+    """ mout = iotools.Map(name='lwp.mrc')
     mout.arr = lwp
     mout.cell = m1.workcell
     mout.origin = m1.origin
-    mout.write()
+    mout.write() """
 
 
 if __name__=="__main__":
