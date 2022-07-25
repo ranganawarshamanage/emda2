@@ -134,15 +134,13 @@ class Bfgs:
         print('Final axis: ', self.ax_final)   
 
 
-def fsc_between_static_and_transfomed_map(
-    staticmap, movingmap, bin_idx, rm, t, cell, nbin
-):
+def fsc_between_static_and_transfomed_map(staticmap, bin_idx, rm, t, nbin):
     nx, ny, nz = staticmap.shape
     st, _, _, _ = fc.get_st(nx, ny, nz, t)
-    frt_full = rotate_f(rm, movingmap * st, interp="linear")[:, :, :, 0]
+    frt = st * rotate_f(rm, staticmap, interp="linear")[:, :, :, 0]
     f1f2_fsc = fsctools.anytwomaps_fsc_covariance(
-        staticmap, frt_full, bin_idx, nbin)[0]
-    return f1f2_fsc
+        staticmap, frt, bin_idx, nbin)[0]
+    return f1f2_fsc, frt
 
 
 def run_fit(
@@ -177,21 +175,22 @@ def run_fit(
     try:
         for i in range(nmarchingcycles):
             if i == 0:
-                f1f2_fsc = fsc_between_static_and_transfomed_map(
+                f1f2_fsc, frt = fsc_between_static_and_transfomed_map(
                     staticmap=emmap1.fo_lst[0],
-                    movingmap=emmap1.fo_lst[0],
                     bin_idx=emmap1.bin_idx,
                     rm=rotmat,
                     t=t,
-                    cell=emmap1.map_unit_cell,
                     nbin=emmap1.nbin,
                 )
+                """ transformedmap = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(frt))))
+                tm1 = iotools.Map('movingmap_initial.mrc')
+                tm1.arr = transformedmap
+                tm1.cell = emmap1.map_unit_cell
+                tm1.origin = [0,0,0]
+                tm1.write() """
                 f1f2_fsc_old = f1f2_fsc
                 fsc_lst.append(f1f2_fsc)
                 if fitfsc > 0.999:
-                    afsc_fnl = afsc_ini = np.average(f1f2_fsc[:fitbin])
-                    resol_fsc = emmap1.res_arr[fitbin]
-                    rotmat = rotmat
                     print("\n***FSC between static and moving maps***\n")
                     print("bin#     resolution(A)      start-FSC     end-FSC\n")
                     for j in range(len(emmap1.res_arr)):
@@ -213,13 +212,11 @@ def run_fit(
                     print('Resolution= %s (A)' %emmap1.res_arr[ibin])
                     print('FSC between two copies is too low. FSC= %s ibin=%s' %(f1f2_fsc[ibin], ibin))
             else:
-                f1f2_fsc = fsc_between_static_and_transfomed_map(
+                f1f2_fsc, frt = fsc_between_static_and_transfomed_map(
                     emmap1.fo_lst[0],
-                    emmap1.fo_lst[ifit],
                     emmap1.bin_idx,
                     rotmat,
                     t,
-                    emmap1.map_unit_cell,
                     emmap1.nbin,
                 )          
                 ibin = get_ibin(filter_fsc(f1f2_fsc), cutoff=fitfsc)
@@ -246,15 +243,28 @@ def run_fit(
                         plot_title="FSC based on Symmetry axis", 
                         fscline=1.,
                         mapname="fsc_axis.eps")
+                    # test output
+                    """ stmap = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(emmap1.fo_lst[0]))))
+                    transformedmap = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(frt))))
+                    stm = iotools.Map('static_map.mrc')
+                    stm.arr = stmap
+                    stm.cell = emmap1.map_unit_cell
+                    stm.origin = [0,0,0]
+                    stm.write()
+                    tm = iotools.Map('fitted_map.mrc')
+                    tm.arr = transformedmap
+                    tm.cell = emmap1.map_unit_cell
+                    tm.origin = [0,0,0]
+                    tm.write() """                    
                     break
                 elif ibin_old > ibin:
                     fsc_lst.append(f1f2_fsc_old)
                     res_arr = emmap1.res_arr[:ibin_old]
                     fsc_bef = fsc_lst[0][:ibin_old]
                     fsc_aft = fsc_lst[1][:ibin_old]
-                    afsc_ini = np.average(fsc_bef)
-                    afsc_fnl = np.average(fsc_aft)
-                    resol_fsc = emmap1.res_arr[ibin_old]
+                    #afsc_ini = np.average(fsc_bef)
+                    #afsc_fnl = np.average(fsc_aft)
+                    #resol_fsc = emmap1.res_arr[ibin_old]
                     print("\n***FSC between static and moving maps***\n")
                     print("bin#     resolution(A)      start-FSC     end-FSC\n")
                     for j in range(len(res_arr)):
@@ -296,7 +306,7 @@ def run_fit(
                 bfgs.method = 'nelder-mead'
                 bfgs.optimize()
                 current_axis = bfgs.ax_final
-                t = -bfgs.t
+                t = bfgs.t
                 q = quaternions.get_quaternion(list(current_axis), bfgs.angle)
                 rotmat = quaternions.get_RM(q)
                 final_axis_previous = final_axis
