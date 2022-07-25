@@ -186,11 +186,11 @@ def mask_from_map_connectedpixels(m1, binthresh=None):
             max_density_value * 0.1
     
     Outputs:
-        mask: generated mask as an ndarray
+        masklist: sorted masks according to their rmsd (largest first)
     """
     from emda2.ext.mapmask import mapmask_connectedpixels
-    mask, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
-    return mask
+    masklist, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
+    return masklist
 
 def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=None, res_arr=None):
     """Lowpass filters a map to a specified resolution.
