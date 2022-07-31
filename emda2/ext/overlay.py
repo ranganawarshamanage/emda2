@@ -474,10 +474,12 @@ def determine_ibin(bin_fsc, cutoff=0.15):
         i += 1
         if i > 100:
             print("Fit starting configurations are too far.")
-            raise SystemExit()
+            return 0
+            #raise SystemExit()
     if ibin == 0:
         print("Fit starting configurations are too far.")
-        raise SystemExit()
+        return 0
+        #raise SystemExit()
     return ibin
 
 def filter_fsc(bin_fsc, thresh=0.05):
@@ -500,6 +502,8 @@ def run_fit(
     fobj=None,
     fitres=None,
     optmethod='custom',
+    t_only=False,
+    r_only=False,
 ):
     from emda.core.quaternions import rot2quart
 
@@ -562,6 +566,9 @@ def run_fit(
                 nbin=emmap1.nbin,
             )
             ibin = determine_ibin(f1f2_fsc)
+            if ibin == 0:
+                print("ibin = 0, Cannot proceed! Stopping now...")
+                return None
             if fitbin < ibin:
                 ibin = fitbin
             if emmap1.res_arr[ibin] < 2.0:
@@ -623,8 +630,9 @@ def run_fit(
             else:
                 ibin_old = ibin
         if ibin == 0:
-            print("ibin = 0")
-            raise SystemExit("Cannot proceed! Stopping now...")
+            print("ibin = 0, Cannot proceed! Stopping now...")
+            #raise SystemExit("Cannot proceed! Stopping now...")
+            return None
         # smoothen e maps
         fsc_wght = fcodes_fast.read_into_grid(
             emmap1.bin_idx, 
@@ -656,7 +664,16 @@ def run_fit(
             rfit.comshift = comshift
             slf = ibin
             slf = min([ibin, 100])
-            rfit.optimizer(ncycles, t, rotmat, ifit, smax_lf=slf, fobj=fobj)   
+            rfit.optimizer(
+                ncycles=ncycles, 
+                t=t, 
+                rotmat=rotmat, 
+                ifit=ifit, 
+                smax_lf=slf, 
+                fobj=fobj,
+                t_only=t_only,
+                r_only=r_only,
+                )   
             static_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(rfit.e0))))
             fitted_map = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(rfit.ert))))     
         else:
@@ -678,7 +695,7 @@ def run_fit(
         q = quaternions.quaternion_multiply(rfit.q, q)        
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
-    return t, q_final
+    return [t, q_final]
 
 
 def overlay(
