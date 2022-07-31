@@ -933,6 +933,89 @@ subroutine get_normalized_sf(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz, &
 end subroutine get_normalized_sf
 
 
+subroutine get_normalized_sf_singlemap(Fo,bin_idx,nbin,mode,nx,ny,nz, Eo)
+implicit none
+real*8, parameter :: PI = 3.141592653589793
+
+integer, intent(in) :: nbin,mode,nx,ny,nz
+complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: Fo
+complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: Eo
+integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in) :: bin_idx
+! locals
+real*8, dimension(0:nbin-1) :: bin_total_var
+integer, dimension(0:nbin-1) :: bin_arr_count
+integer, dimension(3) :: nxyz
+real*8, dimension(0:nbin-1) :: A_sum,B_sum,AA_sum,BB_sum
+real*8     :: A,B
+real       :: start,finish
+integer    :: i,j,k,xyzmin(3),xyzmax(3),ibin
+!
+logical :: debug
+debug         = .FALSE.
+if(mode == 1) debug = .TRUE.
+call cpu_time(start)
+
+Eo = dcmplx(0.0d0, 0.0d0)
+bin_total_var = 0.0
+
+A_sum = 0.0
+B_sum = 0.0
+AA_sum = 0.0
+BB_sum = 0.0
+
+bin_arr_count = 0
+xyzmin = 0; xyzmax = 0
+nxyz = (/ nx, ny, nz /)
+
+xyzmin(1) = int(-nxyz(1)/2)
+xyzmin(2) = int(-nxyz(2)/2)
+xyzmin(3) = int(-nxyz(3)/2)
+xyzmax    = -(xyzmin+1)
+if(debug) print*, 'Use only hemisphere data'
+if(debug) print*, 'xyzmin = ', xyzmin
+if(debug) print*, 'xyzmax = ', xyzmax(1),xyzmax(2),0
+
+do i=xyzmin(1), xyzmax(1)
+   do j=xyzmin(2), xyzmax(2)
+      do k=xyzmin(3), 0
+         if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+         if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+         bin_arr_count(bin_idx(i,j,k)) = bin_arr_count(bin_idx(i,j,k)) + 1            
+         A = real(Fo(i,j,k)); B = aimag(Fo(i,j,k))
+         A_sum(bin_idx(i,j,k)) = A_sum(bin_idx(i,j,k)) + A
+         AA_sum(bin_idx(i,j,k)) = AA_sum(bin_idx(i,j,k)) + A*A
+         B_sum(bin_idx(i,j,k)) = B_sum(bin_idx(i,j,k)) + B
+         BB_sum(bin_idx(i,j,k)) = BB_sum(bin_idx(i,j,k)) + B*B
+      end do
+   end do
+end do
+
+if(debug) print*, 'bin_arr_count=', sum(bin_arr_count)
+
+do ibin=0, nbin-1 !to make compatible with python arrays
+   bin_total_var(ibin) = (AA_sum(ibin) + BB_sum(ibin))/bin_arr_count(ibin) &
+        - ((A_sum(ibin)/bin_arr_count(ibin))**2 + (B_sum(ibin)/bin_arr_count(ibin))**2)
+   if(debug)then
+      print*,ibin,bin_total_var(ibin),bin_arr_count(ibin)
+   end if
+end do
+
+! Calculate normalized structure factors
+do i=xyzmin(1), xyzmax(1)
+   do j=xyzmin(2), xyzmax(2)
+      do k=xyzmin(3), 0
+         if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+         if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+         Eo(i,j,k) = Fo(i,j,k) / sqrt(bin_total_var(bin_idx(i,j,k)))
+         Eo(-i,-j,-k) = conjg(Eo(i,j,k))
+      end do
+   end do
+end do
+call cpu_time(finish)
+if(debug) print*, 'time for calculation(s) = ', finish-start
+end subroutine get_normalized_sf_singlemap
+
+
 !!$subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
 !!$     F1F2_covar,bin_fsc,bin_arr_count,nx,ny,nz)
 !!$  implicit none
