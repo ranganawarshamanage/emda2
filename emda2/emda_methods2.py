@@ -31,6 +31,30 @@ def get_map_power(fo, bin_idx, nbin):
     power_spectrum = maptools.get_map_power(fo=fo, bin_idx=bin_idx, nbin=nbin)
     return power_spectrum
 
+def get_normalized_sf(fo, bin_idx, nbin):
+    """Calculates normalised Fourier coefficients.
+    Fourier coefficients are normalised by their radial
+    power in bins.
+
+    Arguments:
+        Inputs:
+            fo: complex Fourier coefficeints, ndarray
+            bin_idx: 3D grid of bin numbers, integer
+            nbin: number of resolution bins, integer
+
+        Outputs:
+            eo: complex, normalized Fourier coefficients.
+    """
+    nx, ny, nz = fo.shape
+    eo = fcodes2.get_normalized_sf_singlemap(
+        fo=fo,
+        bin_idx=bin_idx,
+        nbin=nbin,
+        mode=0,
+        nx=nx,ny=ny,nz=nz,
+        )
+    return eo
+
 def fsc(f1, f2, bin_idx, nbin, fobj=None, xmlobj=None):
     """Returns Fourier Shell Correlation (FSC) between any two maps.
 
@@ -615,6 +639,9 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
     """
     from emda2.ext import axis_refinement
 
+    if fobj is None:
+        fobj = open('emda_axis-refine.txt', 'w')
+
     emmap1 = axis_refinement.EmmapOverlay(arr=m1.workarr)
     emmap1.map_unit_cell = m1.workcell
     emmap1.bin_idx = bin_idx
@@ -626,7 +653,7 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
     emmap1.prep_data()
     if t_init is None:
         t_init = [0.0, 0.0, 0.0]
-    initial_ax, final_ax, final_t, ax_pos = axis_refinement.axis_refine(
+    final_ax, final_t, ax_pos = axis_refinement.axis_refine(
         emmap1=emmap1,
         rotaxis=axis,
         symorder=symorder,
@@ -636,7 +663,7 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
         fobj=fobj,
         t_init=t_init,
     )
-    return initial_ax, final_ax, final_t, ax_pos
+    return final_ax, final_t, ax_pos
 
 def rebox_by_mask(arr, mask, padwidth=10):
     """
