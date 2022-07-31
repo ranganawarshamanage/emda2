@@ -20,6 +20,10 @@ def calc_fsc(f1, f2, bin_idx, nbin):
     f1f2_covar, binfsc, bincounts = fcodes_fast.calc_covar_and_fsc_betwn_anytwomaps(
         f1, f2, bin_idx, nbin, debug_mode, nx, ny, nz
     )
+    # test 26/7/2022
+    #for i, ifsc in enumerate(binfsc):
+    #    print(i, ifsc, bincounts[i])
+    #
     """ results = anytwomaps_fsc_covariance(
         f1=f1, 
         f2=f2, 
@@ -190,7 +194,21 @@ class Optimiser:
         fval = np.sum(self.w_grid * self.e0 * np.conjugate(self.ert))
         return fval.real
 
-    def optimizer(self, ncycles, t, rotmat, ifit, smax_lf, fobj=None, q_init=None):
+    def optimizer(
+        self, 
+        ncycles, 
+        t, 
+        rotmat, 
+        ifit, 
+        smax_lf, 
+        t_only=False, 
+        r_only=False, 
+        fobj=None, 
+        q_init=None
+        ):
+        rotation = translation = True
+        if t_only: rotation = False
+        if r_only: translation = False
         tol = 1e-2
         fsc_lst = []
         fval_list = []
@@ -216,17 +234,46 @@ class Optimiser:
                 self.ert = self.e1
                 self.crt = self.cfo
             else:
-                # first rotate
-                self.rotmat = quaternions.get_RM(self.q)
-                maps2send = np.stack((self.e1, self.cfo), axis = -1)
-                bin_idx = self.mapobj.cbin_idx
-                nbin = self.mapobj.cbin
-                maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
-                # then translate
-                self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
-                self.sv = np.array([s1, s2, s3])
-                self.ert = maps[:, :, :, 0] * self.st
-                self.crt = maps[:, :, :, 1] * self.st
+                if rotation and not translation:
+                    # rotation only
+                    # first rotate
+                    self.rotmat = quaternions.get_RM(self.q)
+                    maps2send = np.stack((self.e1, self.cfo), axis = -1)
+                    bin_idx = self.mapobj.cbin_idx
+                    nbin = self.mapobj.cbin
+                    maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                    # then translate
+                    self.t = np.array([0.0, 0.0, 0.0], dtype="float")
+                    self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
+                    self.sv = np.array([s1, s2, s3])
+                    self.ert = maps[:, :, :, 0] * self.st
+                    self.crt = maps[:, :, :, 1] * self.st
+                elif translation and not rotation:
+                    # translation only
+                    # first rotate
+                    self.rotmat = np.identity(3, 'float')
+                    maps2send = np.stack((self.e1, self.cfo), axis = -1)
+                    bin_idx = self.mapobj.cbin_idx
+                    nbin = self.mapobj.cbin
+                    maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                    # then translate
+                    self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
+                    self.sv = np.array([s1, s2, s3])
+                    self.ert = maps[:, :, :, 0] * self.st
+                    self.crt = maps[:, :, :, 1] * self.st   
+                else:
+                    # both rotation and translation need to refine
+                    # first rotate
+                    self.rotmat = quaternions.get_RM(self.q)
+                    maps2send = np.stack((self.e1, self.cfo), axis = -1)
+                    bin_idx = self.mapobj.cbin_idx
+                    nbin = self.mapobj.cbin
+                    maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                    # then translate
+                    self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
+                    self.sv = np.array([s1, s2, s3])
+                    self.ert = maps[:, :, :, 0] * self.st
+                    self.crt = maps[:, :, :, 1] * self.st
             self.fsc, fsc_avg = self.calc_fsc()
             fsc_lst.append(self.fsc)
             self.w_grid, self.w2_grid = self.get_wght()
@@ -241,35 +288,59 @@ class Optimiser:
                 t_accum_angstrom += self.comshift
             translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
             # check for convergence
-            if i > 5:
-                #fval_avg = (fval_list[-5] + fval_list[-4] + fval_list[-3] + fval_list[-2] + fval_list[-1]) / 5
-                if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
-                    break
-            """ if i > 0 and abs(fval_list[-1] - fval_list[-2]) < tol:
-                break """
-            if i % 2 == 0:
+            if rotation and not translation:
+                if i > 2:
+                    if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
+                        break
+            elif translation and not rotation:
+                if i > 2:
+                    if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
+                        break
+            else:                
+                if i > 5:
+                    if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
+                        break
+            if rotation and not translation:
                 self.step = derivatives_rotation(
                     self.e0, self.ert, self.w_grid, self.sv, self.q, xyz, xyz_sum)
                 lft = ndlinefit()
-                #print('linefit rot')
                 lft.get_linefit_static_data(
                     [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
                 lft.step = self.step
-                #lft.q_prev = self.q
                 alpha_r = lft.scalar_opt()
                 self.q += np.insert(self.step * alpha_r, 0, 0.0)
                 self.q = self.q / np.sqrt(np.dot(self.q, self.q))
-            else:
+            elif translation and not rotation:    
                 # translation optimisation
                 self.step = derivatives_translation(
                     self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
                 lft = linefit()
-                #print('linefit trans')
                 lft.get_linefit_static_data(
                     [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
                 lft.step = self.step
                 alpha_t = lft.scalar_opt_trans()
                 self.t += self.step * alpha_t
+            else:                                        
+                if i % 2 == 0:
+                    self.step = derivatives_rotation(
+                        self.e0, self.ert, self.w_grid, self.sv, self.q, xyz, xyz_sum)
+                    lft = ndlinefit()
+                    lft.get_linefit_static_data(
+                        [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                    lft.step = self.step
+                    alpha_r = lft.scalar_opt()
+                    self.q += np.insert(self.step * alpha_r, 0, 0.0)
+                    self.q = self.q / np.sqrt(np.dot(self.q, self.q))
+                else:
+                    # translation optimisation
+                    self.step = derivatives_translation(
+                        self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
+                    lft = linefit()
+                    lft.get_linefit_static_data(
+                        [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                    lft.step = self.step
+                    alpha_t = lft.scalar_opt_trans()
+                    self.t += self.step * alpha_t
             print(
                 "{:5d} {:8.4f} {:6.4f} {:6.4f} {:8.7f}".format(
                     i, fval, theta2, translation_vec, fsc_avg
@@ -305,6 +376,7 @@ class linefit:
 
     def get_fsc_wght(self, e0, ert, bin_idx, nbin):
         cx, cy, cz = e0.shape
+        #print('TRANSLATION')
         fsc = calc_fsc(e0, ert, bin_idx, nbin)[0]
         w_grid = fcodes2.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
         return w_grid
@@ -366,6 +438,7 @@ class ndlinefit:
         cx, cy, cz = e0.shape
         """ bin_stats = core.fsc.anytwomaps_fsc_covariance(e0, ert, bin_idx, nbin)
         fsc, _ = bin_stats[0], bin_stats[1] """
+        #print('ROTATION')
         fsc = calc_fsc(e0, ert, bin_idx, nbin)[0]
         w_grid = fcodes_fast.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
         return w_grid
