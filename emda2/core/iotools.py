@@ -212,8 +212,8 @@ def padimage(arr, tdim):
         tnx = tny = tnz = tdim[0]
     else:
         raise SystemExit("More than 3 dimensions given. Cannot handle")
-    print("current shape: ", arr.shape)
-    print("target shape: ", tdim)
+    #print("current shape: ", arr.shape)
+    #print("target shape: ", tdim)
     nx, ny, nz = arr.shape
     assert tnx >= nx
     assert tny >= ny
@@ -238,8 +238,8 @@ def cropimage(arr, tdim):
     else:
         raise SystemExit("More than 3 dimensions given. Cannot handle")
     nx, ny, nz = arr.shape
-    print("Current dim [nx, ny, nz]: ", nx, ny, nz)
-    print("Target dim [nx, ny, nz]: ", tnx, tny, tnz)
+    #print("Current dim [nx, ny, nz]: ", nx, ny, nz)
+    #print("Target dim [nx, ny, nz]: ", tnx, tny, tnz)
     assert tnx <= nx
     assert tny <= ny
     assert tnz <= nz
