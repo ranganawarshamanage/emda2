@@ -237,7 +237,7 @@ m2.write()
 exit() """
 
 # 10. Mask from Map
-imap = "/Users/ranganaw/MRC/REFMAC/Check_mask/EMD-10563/emd_10563.map"
+""" imap = "/Users/ranganaw/MRC/REFMAC/Check_mask/EMD-10563/emd_10563.map"
 m1 = iotools.Map(name=imap)
 m1.read()
 mask, lwp = em.mask_from_map(uc=m1.workcell, arr=m1.workarr, resol=10., filter='butterworth')
@@ -247,6 +247,21 @@ m2.cell = m1.cell
 m2.arr = croppedImage
 m2.origin = m1.origin
 m2.axorder = m1.axorder
-m2.write()
+m2.write() """
+
+# 11. Mask from Map using connected pixels
+
+#12. rotation center of the map
+imap = "/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/other/rotation_centre/emda_rbxfullmap_emd-3651.mrc"
+imask = "/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/other/rotation_centre/emda_rbxmapmask_emd-3651.mrc"
+axis = [2.94523737e-03, 2.89148106e-06, 9.99995663e-01]
+order = 2
+resol = 4.
+m1 = iotools.Map(imap)
+m1.read()
+mm = iotools.Map(imask)
+mm.read()
+rc = em.get_rotation_center(m1=m1, mm=mm, axis=axis, order=order, resol=resol)
+print(rc)
 
 
