@@ -590,7 +590,19 @@ def realsp_correlation_mapmodel(
     )
     return mapmodel_rcc, kern_rad
 
-def overlay(arrlist, pixlist, cell, origin, nocom=False, optmethod=None, tlist=None, qlist=None, fitres=None):
+def overlay(
+    arrlist, 
+    pixlist, 
+    cell, 
+    origin, 
+    nocom=False, 
+    optmethod=None, 
+    tlist=None, 
+    qlist=None, 
+    fitres=None,
+    r_only=False,
+    t_only=False,
+    ):
     from emda2.ext import utils
     maplist = []
     mask = utils.sphere_mask(arrlist[0].shape[0])
@@ -602,7 +614,10 @@ def overlay(arrlist, pixlist, cell, origin, nocom=False, optmethod=None, tlist=N
                                       targt_dim=arrlist[0].shape)
         maplist.append(resampled_arr * mask)
     from emda2.ext import overlay
-    emmap1 = overlay.EmmapOverlay(map_list=maplist, nocom=nocom)
+    if r_only:
+        emmap1 = overlay.EmmapOverlay(map_list=maplist, nocom=True)
+    else:
+        emmap1 = overlay.EmmapOverlay(map_list=maplist, nocom=nocom)
     emmap1.map_origin = origin
     emmap1.pixsize = pixlist[0]
     emmap1.map_dim = arrlist[0].shape
@@ -613,14 +628,23 @@ def overlay(arrlist, pixlist, cell, origin, nocom=False, optmethod=None, tlist=N
         tlist = [[0., 0., 0.] for _ in range(len(arrlist))]
     if qlist is None:
         qlist = [[1., 0., 0., 0.] for _ in range(len(arrlist))]
-    emmap1, rotmat_list, trans_list = overlay.overlay(emmap1=emmap1,
-            tlist=tlist, qlist=qlist, ncycles=100, fitres=fitres, optmethod=optmethod)
+    emmap1, rotmat_list, trans_list = overlay.overlay(
+        emmap1=emmap1,
+        tlist=tlist, 
+        qlist=qlist, 
+        ncycles=100, 
+        fitres=fitres, 
+        optmethod=optmethod,
+        r_only=r_only,
+        t_only=t_only,
+        )
     return emmap1, rotmat_list, trans_list
 
 def refine_magnification():
     pass
 
-def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None, res_arr=None, bin_idx=None, nbin=None):
+def refine_axis(
+    m1, axis, symorder, fitres=6, fitfsc=0.5, optmethod='nelder-mead', fobj=None, t_init=None, res_arr=None, bin_idx=None, nbin=None):
     """
     Inputs:
         m1: Map object made with iotools.Map()
@@ -631,6 +655,7 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
                 default to 0.5
         fobj: object for logfile output
         t_init: initial translation vector to apply. default to x=0, y=0, z0
+        optmethod: axis optimisation method, default to Nelder-Mead
 
     Outputs:
         initial_ax: same as input axis, but normalised
@@ -662,8 +687,17 @@ def refine_axis(m1, axis, symorder, fitres=6, fitfsc=0.5, fobj=None, t_init=None
         ncycles=10,
         fobj=fobj,
         t_init=t_init,
+        optmethod=optmethod,
     )
     return final_ax, final_t, ax_pos
+
+def get_rotation_center(m1, mm, axis, order, resol):
+    from emda2.ext.sym import get_rotation_center
+    results = get_rotation_center.get_rotation_center(
+        m1=m1, mm=mm, axis=axis, order=order, claimed_res=resol
+    )
+    rotation_center = results[2]
+    return rotation_center
 
 def rebox_by_mask(arr, mask, padwidth=10):
     """
