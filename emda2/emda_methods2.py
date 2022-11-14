@@ -699,7 +699,7 @@ def get_rotation_center(m1, mm, axis, order, resol):
     rotation_center = results[2]
     return rotation_center
 
-def rebox_by_mask(arr, mask, padwidth=10):
+def rebox_by_mask(arr, mask, mask_origin, padwidth=10):
     """
     Rebox a map using provided mask
 
@@ -715,6 +715,7 @@ def rebox_by_mask(arr, mask, padwidth=10):
     reboxed_map, reboxed_mask = rebox_using_mask(
         arr=arr, 
         mask=mask, 
+        mask_origin=mask_origin,
         padwidth=padwidth)
     return reboxed_map, reboxed_mask
 
