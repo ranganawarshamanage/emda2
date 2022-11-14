@@ -230,7 +230,7 @@ def rebox_using_radius(arr, padwidth=10, rad=None):
     newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
     return newarr
 
-def rebox_using_mask(arr, mask, padwidth=10):
+""" def rebox_using_mask(arr, mask, padwidth=10):
     mask = mask * (mask > 1.e-5)
     i, j, k = np.nonzero(mask)
     z2, y2, x2 = np.max(i), np.max(j), np.max(k)
@@ -252,7 +252,51 @@ def rebox_using_mask(arr, mask, padwidth=10):
     dx += padwidth
     newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
     newmask[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = mask[z1:z2, y1:y2, x1:x2]
-    return newarr, newmask
+    return newarr, newmask """
+
+def rebox_using_mask(arr, mask, mask_origin, padwidth=10):
+    mask = mask * (mask > 1.e-5)
+    mo1, mo2, mo3 = mask_origin
+    i, j, k = np.nonzero(mask)
+    z2, y2, x2 = np.max(i), np.max(j), np.max(k)
+    z1, y1, x1 = np.min(i), np.min(j), np.min(k)
+    dimz = z2 - z1
+    dimy = y2 - y1
+    dimx = x2 - x1
+    dim = np.max([dimz, dimy, dimx])
+    if dim % 2 != 0:
+        dim += 1
+    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    newmask = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    print((dim - dimz), (dim - dimy), (dim - dimx))
+    dz = (dim - dimz) // 2
+    dy = (dim - dimy) // 2
+    dx = (dim - dimx) // 2
+    dz += padwidth
+    dy += padwidth
+    dx += padwidth
+    #
+    z1arr = z1+mo1
+    z2arr = z2+mo1
+    y1arr = y1+mo2
+    y2arr = y2+mo2
+    x1arr = x1+mo3
+    x2arr = x2+mo3
+    nx, ny, nz = arr.shape
+    try:
+        assert z1arr < z2arr <= nz
+        assert y1arr < y2arr <= ny
+        assert x1arr < x2arr <= nx
+        # non-cubic box
+        #newarr = arr[z1+mo1:z2+mo1, y1+mo2:y2+mo2, x1+mo3:x2+mo3]
+        #newmask = mask[z1:z2, y1:y2, x1:x2]
+        # cubic box
+        newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1arr:z2arr, y1arr:y2arr, x1arr:x2arr]
+        newmask[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = mask[z1:z2, y1:y2, x1:x2]
+        return newarr, newmask
+    except Exception as e:
+        print(e)
+
 
 def rebox_using_model(imap, model):
     """
