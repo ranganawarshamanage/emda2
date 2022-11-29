@@ -1,6 +1,11 @@
 from __future__ import division, absolute_import, print_function
 import setuptools
-from numpy.distutils.core import setup, Extension
+
+try:
+    from numpy.distutils.core import setup, Extension
+except ImportError:
+    print("Numpy is not installed! Please install Numpy first and then try")
+    raise SystemExit()
 
 ex1 = Extension(name = 'fcodes2', 
                 sources = ['emda2/fcodes2.f90'])
@@ -18,7 +23,25 @@ setup(name='emda2',
     license='MPL-2.0',
     packages=setuptools.find_packages(),
     #ext_modules =[ex1],
-    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi','servalcat'],
+    install_requires=[
+        'pandas>=0.23.4',
+        'mrcfile',
+        'matplotlib',
+        'numpy',
+        'scipy',
+        'gemmi',
+        'servalcat',
+        'tabulate',
+        'more_itertools',
+        'proshade',
+        ],
     ext_modules =[ex1],
     #test_suite='emda.tests',
+    entry_points={
+      'console_scripts': [
+          #'emda_test = emda.emda_test:main',
+          #'emda_test_exhaust = emda.emda_test_exhaust:main',
+          'emda2 = emda2.emda_cli:main',
+                          ],
+      },
     zip_safe= False)
