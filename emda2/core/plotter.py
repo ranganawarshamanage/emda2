@@ -109,7 +109,8 @@ def plot_nlines(
     # import mpl_toolkits.axisartist as AA
 
     if curve_label is None:
-        curve_label = ["halfmap_fsc"]
+        #curve_label = ["halfmap_fsc"]
+        curve_label = ['series%s'%(i+1) for i in range(len(list_arr))]
     bin_arr = np.arange(len(res_arr))
     fig = plt.figure(figsize=(6, 4))
     # ax1 = host_subplot(111,axes_class=AA.Axes)
