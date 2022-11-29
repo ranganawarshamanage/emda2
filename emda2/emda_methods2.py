@@ -757,26 +757,34 @@ def flip_arr(arr, axis='z'):
     except Exception as e:
         raise e
 
+def get_pointgroup(half1, mask, resol=None):
+    from emda2.ext.sym.symanalysis_pipeline import main
+    results = main(half1=half1, imask=mask, resol=resol)
+    return results
+    
+
 
 if __name__=="__main__":
-    imap = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_trimmed.mrc"
+    """ imap = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_trimmed.mrc"
     mapobj = iotools.Map(name=imap)
     mapobj.read()
     nbin, res_arr, bin_idx = get_binidx(mapobj.cell, mapobj.arr)
-    """ power_spectrum = get_map_power(fo=np.fft.fftshift(np.fft.fftn(mapobj.arr)),
+    power_spectrum = get_map_power(fo=np.fft.fftshift(np.fft.fftn(mapobj.arr)),
                 bin_idx=bin_idx, nbin=nbin)
     print("Resolution   bin     Power")
     for i in range(len(res_arr)):
         print("{:.2f} {:.4f}".format(res_arr[i], power_spectrum[i]))    
     exit() """
-    imap1 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_half_map_1_trimmed.mrc"
+
+    """ imap1 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_half_map_1_trimmed.mrc"
     imap2 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_half_map_2_trimmed.mrc"
     #imap1 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/EMD-7770/emd_7770_half1.map"
     #imap2 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/EMD-7770/emd_7770_half2.map"
     mapobj1 = iotools.Map(name=imap1)
     mapobj1.read()
     mapobj2 = iotools.Map(name=imap2)
-    mapobj2.read()
+    mapobj2.read() """
+
     """ nbin, res_arr, bin_idx = get_binidx(mapobj1.cell, mapobj1.arr)
     twomapfsc = fsc(f1=np.fft.fftshift(np.fft.fftn(mapobj1.arr)),
                     f2=np.fft.fftshift(np.fft.fftn(mapobj2.arr)),
@@ -786,7 +794,8 @@ if __name__=="__main__":
     plotter.plot_nlines(res_arr=res_arr,
                         list_arr=[twomapfsc],
                         mapname="twomap_fsc.eps",) """
-    mask = mask_from_halfmaps(uc=mapobj1.cell,
+
+    """ mask = mask_from_halfmaps(uc=mapobj1.cell,
                               half1=mapobj1.arr,
                               half2=mapobj2.arr,)
     mobj = iotools.Map()
@@ -794,4 +803,10 @@ if __name__=="__main__":
     mobj.cell = mapobj1.cell
     mobj.origin = mapobj1.origin
     mobj.axorder = mapobj1.axorder
-    mobj.write(filename='mask.map')
+    mobj.write(filename='mask.map') """
+
+    # finding pointgroup
+    half1 = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-21231/emd_21231_half_map_1.map"
+    mask = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-21231/emd_21231_msk_1.map"
+    resol = 6
+    get_pointgroup(half1, mask, resol)
