@@ -1,3 +1,11 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 import numpy as np
 import math
 from more_itertools import sort_together
@@ -22,7 +30,7 @@ def prime_factors(n):
 def prefilter_order(f1, axis, order, nbin, bin_idx):
     # prime factorization
     factors = prime_factors(order)
-    factors.append(np.prod(np.asarray(factors), dtype='int'))
+    #factors.append(np.prod(np.asarray(factors), dtype='int'))
     avgfsclist = []
     true_order = None
     if len(factors) == 1:
@@ -35,7 +43,7 @@ def prefilter_order(f1, axis, order, nbin, bin_idx):
         axis = axis / math.sqrt(np.dot(axis, axis))
         for fac in factors:
             theta = float(360.0 / fac)
-            f_transformed = maptools.map_transform(
+            f_transformed = maptools.transform_f(
                 flist=[f1], 
                 axis=axis, 
                 translation=[0., 0., 0.], 
@@ -45,7 +53,13 @@ def prefilter_order(f1, axis, order, nbin, bin_idx):
                 f1, f_transformed[0], bin_idx, nbin)[0]
             avg_fsc = np.average(fsc)
             avgfsclist.append(avg_fsc)
-        true_order = factors[np.argmax(np.asarray(avgfsclist))]
+        #true_order = factors[np.argmax(np.asarray(avgfsclist))]
+        fscmax = np.amax(avgfsclist)
+        newlist = []
+        for i, val in enumerate(avgfsclist):
+            if abs(val - fscmax) < 0.1:
+                newlist.append(factors[i])
+        true_order = np.prod(newlist)
     return true_order
 
 def cosine_angle(ax1, ax2):
@@ -63,7 +77,7 @@ def cosine_angle(ax1, ax2):
 
 def get_avgfsc(order, axis, f1, bin_idx, nbin):
     theta = float(360.0 / order)
-    f_transformed = maptools.map_transform(
+    f_transformed = maptools.transform_f(
         flist=[f1], 
         axis=axis, 
         translation=[0., 0., 0.], 
@@ -172,7 +186,7 @@ def filter_axes(axlist, orderlist, fo, bin_idx, nbin,
         axis = np.asarray(axis, 'float')
         axis = axis / math.sqrt(np.dot(axis, axis))
         theta = float(360.0 / order)
-        f_transformed = maptools.map_transform(
+        f_transformed = maptools.transform_f(
             flist=[fo], 
             axis=axis, 
             translation=cleaned_tlist[i], 
