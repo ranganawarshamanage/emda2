@@ -1,3 +1,10 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
@@ -20,11 +27,11 @@ def decide_pointgroup(axeslist, orderlist):
     gp_generator_ax2 = None
     order1 = order2 = 0
     ang_tol = 1.0  # Degrees
-    print("unique orders: ", uniqorder)
+    #print("unique orders: ", uniqorder)
     if len(uniqorder) == 1:
-        print("Len of uniqorder: ", 1)
+        #print("Len of uniqorder: ", 1)
         if uniqorder[0] == 1:
-            print("Unsymmetrized map")
+            #print("Unsymmetrized map")
             point_group = 'C1'
             order1 = 1
         elif uniqorder[0] != 1:
@@ -35,7 +42,7 @@ def decide_pointgroup(axeslist, orderlist):
                 order1 = uniqorder[0]
             elif len(odrn) > 1:
                 if uniqorder[0] == 2:
-                    print("Checking for D symmetry...")
+                    #print("Checking for D symmetry...")
                     for i in odrn:
                         for j in odrn:
                             if i != j:
@@ -48,10 +55,10 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odrn[1]]
                         order1 = order2 = 2
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
                 elif uniqorder[0] == 3:
-                    print("Checking for T symmetry...")
+                    #print("Checking for T symmetry...")
                     for i in odrn:
                         for j in odrn:
                             if i != j:
@@ -66,11 +73,11 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odrn[1]]
                         order1 = order2 = 3
                     else:
-                        print("test1")
-                        print("Unknown point group.")
+                        #print("test1")
+                        #print("Unknown point group.")
                         point_group = 'Unkown'
                 elif uniqorder[0] == 4:
-                    print("Checking for O symmetry...")
+                    #print("Checking for O symmetry...")
                     for i in odrn:
                         for j in odrn:
                             if i != j:
@@ -83,10 +90,10 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odrn[1]]
                         order1 = order2 = 4
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
                 elif uniqorder[0] == 5:
-                    print("Checking for I symmetry...")
+                    #print("Checking for I symmetry...")
                     for i in odrn:
                         for j in odrn:
                             if i != j:
@@ -101,10 +108,10 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odrn[1]]
                         order1 = order2 = 5
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
                 else:
-                    print("Unknown symmetry")
+                    #print("Unknown symmetry")
                     point_group = 'Unkown'
     elif len(uniqorder) == 2:
         if np.any(uniqorder == 2):
@@ -114,7 +121,7 @@ def decide_pointgroup(axeslist, orderlist):
             elif np.any(uniqorder == 3):
                 odr3 = dic[3]  # get all 3-fold axes locations
                 if len(odr3) == 1:
-                    print("Ckecking for D symmetry...")
+                    #print("Ckecking for D symmetry...")
                     for i in odr2:
                         for j in odr3:
                             angle = cosine_angle(axeslist[i], axeslist[j])
@@ -127,10 +134,10 @@ def decide_pointgroup(axeslist, orderlist):
                         order1 = 2
                         order2 = 3
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
                 if len(odr3) > 1:
-                    print("Checking for T symmetry...")
+                    #print("Checking for T symmetry...")
                     for i in odr3:
                         for j in odr3:
                             if i != j:
@@ -146,13 +153,13 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odr3[1]]
                         order1 = order2 = 3
                     else:
-                        print("test2")
-                        print("Unknown point group.")
+                        #print("test2")
+                        #print("Unknown point group.")
                         point_group = 'Unkown'
             elif np.any(uniqorder == 4):
                 odr4 = dic[4]
                 if len(odr4) == 1:
-                    print("Checking for D symmetry...")
+                    #print("Checking for D symmetry...")
                     for i in odr2:
                         for j in odr4:
                             angle = cosine_angle(axeslist[i], axeslist[j])
@@ -165,10 +172,10 @@ def decide_pointgroup(axeslist, orderlist):
                         order1 = 2
                         order2 = 4
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
                 elif len(odr4) > 1:
-                    print("Checking for O symmetry...")
+                    #print("Checking for O symmetry...")
                     for i in odr4:
                         for j in odr4:
                             if i != j:
@@ -181,12 +188,12 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odr4[1]]
                         order1 = order2 = 4
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
             elif np.any(uniqorder == 5):
                 odr5 = dic[5]
                 if len(odr5) == 1:
-                    print("Checking for D symmetry...")
+                    #print("Checking for D symmetry...")
                     for i in odr2:
                         for j in odr5:
                             angle = cosine_angle(axeslist[i], axeslist[j])
@@ -199,10 +206,10 @@ def decide_pointgroup(axeslist, orderlist):
                         order1 = 2
                         order2 = 5
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
                 if len(odr5) > 1:
-                    print("Checking for I symmetry...")
+                    #print("Checking for I symmetry...")
                     for i in odr5:
                         for j in odr5:
                             if i != j:
@@ -217,12 +224,12 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odr5[1]]
                         order1 = order2 = 5
                     else:
-                        print("Unknown symmetry")
+                        #print("Unknown symmetry")
                         point_group = 'Unkown'
             else:
                 n = uniqorder[uniqorder != 2][0]
                 odrn = dic[n]
-                print("Ckecking for D symmetry...")
+                #print("Ckecking for D symmetry...")
                 for i in odr2:
                     for j in odrn:
                         angle = cosine_angle(axeslist[i], axeslist[j])
@@ -235,7 +242,7 @@ def decide_pointgroup(axeslist, orderlist):
                     order1 = 2
                     order2 = n
                 else:
-                    print("Unknown symmetry")
+                    #print("Unknown symmetry")
                     point_group = 'Unkown'
     elif len(uniqorder) > 2:
         # groups must belong to O or I
@@ -245,7 +252,7 @@ def decide_pointgroup(axeslist, orderlist):
                 odr3 = dic[3]
                 if np.any(uniqorder == 4):
                     odr4 = dic[4]
-                    print("Ckecking for O symmetry...")
+                    #print("Ckecking for O symmetry...")
                     for i in odr4:
                         for j in odr4:
                             if i != j:
@@ -258,12 +265,12 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odr4[1]]
                         order1 = order2 = 4
                     else:
-                        print("Unknown point group.")
+                        #print("Unknown point group.")
                         point_group = 'Unkown'
                 elif np.any(uniqorder == 5):
                     # I symmetry
                     odr5 = dic[5]
-                    print("Ckecking for I symmetry...")
+                    #print("Ckecking for I symmetry...")
                     for i in odr5:
                         for j in odr5:
                             if i != j:
@@ -279,10 +286,10 @@ def decide_pointgroup(axeslist, orderlist):
                         gp_generator_ax2 = axeslist[odr5[1]]
                         order1 = order2 = 5
                     else:
-                        print("Unknown point group.")
+                        #print("Unknown point group.")
                         point_group = 'Unkown'
         else:
-            print("Unknown symmetry")
+            #print("Unknown symmetry")
             point_group = 'Unkown'
     return point_group, [order1, order2, gp_generator_ax1, gp_generator_ax2]
 
