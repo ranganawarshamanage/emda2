@@ -5,6 +5,7 @@ import fcodes_fast
 from emda.ext.mapfit import utils as maputils
 import emda2.core as core2
 from emda2.core import iotools
+import warnings
 
 def get_rgi(f):
     myrgi_real = core2.maptools.interp_rgi(data=np.real(f))
@@ -18,12 +19,58 @@ def get_f(f, myrgi_r, myrgi_i, rotmat):
     f_i = myrgi_i(points).reshape(nx,ny,nz)
     return f_r + 1j * f_i
 
+class TookTooLong(Warning):
+    pass
+
+class MinimizeStopper(object):
+    def __init__(self):
+        self.nit = 0
+
+    def __call__(self, xk):
+        self.nit += 1
+        if self.nit > 10:
+            warnings.warn("Terminating optimization: time limit reached",
+                          TookTooLong)
+        else:
+            print("iter: %i " % self.nit)
+
+
+def get_dfs(mapin, xyz, vol):
+    nx, ny, nz = mapin.shape
+    dfs = np.zeros(shape=(nx, ny, nz, 3), dtype=np.complex64)
+    for i in range(3):
+        dfs[:, :, :, i] = np.fft.fftshift(
+            (1 / vol) * 2j * np.pi * np.fft.fftn(mapin * xyz[i])
+        )
+    return dfs
+
+def create_xyz_grid(nxyz):
+    x = np.fft.fftshift(np.fft.fftfreq(nxyz[0]))
+    y = np.fft.fftshift(np.fft.fftfreq(nxyz[1]))
+    z = np.fft.fftshift(np.fft.fftfreq(nxyz[2]))
+    xv, yv, zv = np.meshgrid(x, y, z)
+    return [yv, xv, zv]
+
+def get_dfs2(ert, xyz):
+    rho = np.real(np.fft.ifftn(np.fft.ifftshift(ert)))
+    nx, ny, nz = ert.shape
+    #xyz = create_xyz_grid([nx, ny, nz]) <- this routine is
+    # not used for speed purpose. precalculated grid is used.
+    # otherwise, it is correct. then do not use 1/nx to
+    # calculated the const below.
+    dfs = np.zeros(shape=(nx, ny, nz, 3), dtype=np.complex64)
+    #const = 2j * np.pi #* (1/nx)
+    const = 2j * np.pi / 3.0
+    for i in range(3):
+        dfs[:, :, :, i] = np.fft.fftshift( const * np.fft.fftn(rho * xyz[i]))
+    return dfs
 
 class Bfgs:
     def __init__(self):
         self.method = "BFGS"
         self.e0 = None
         self.e1 = None
+        self.f1 = None
         self.ert = self.e1
         self.ereal_rgi = None
         self.eimag_rgi = None
@@ -41,6 +88,8 @@ class Bfgs:
         self.q_prev = None
         self.pixsize = None
         self.x = np.array([0.1, 0.1, 0.1], 'float')
+        self.map_dim = None
+        self.nit = 0
 
     def hess_r(self, x):
         from emda.core.quaternions import derivatives_wrt_q
@@ -100,36 +149,28 @@ class Bfgs:
 
     def derivatives(self, x):
         from emda.core.quaternions import derivatives_wrt_q
-        from emda.ext.overlay import get_dfs
+        #from emda2.ext.overlay import get_dfs
         # rotation derivatives
         nx, ny, nz = self.e0.shape
         vol = nx * ny * nz
         tpi = (2.0 * np.pi * 1j)
-
-        step = np.asarray(x[3:], 'float')
-        q = np.array([1., 0., 0., 0.], 'float') + np.insert(step, 0, 0.0)
-        q = q / np.sqrt(np.dot(q, q))
-        rotmat = core.quaternions.get_RM(q)
-        #ert = maputils.get_FRS(rotmat, self.e1, interp="linear")[:, :, :, 0]
-        ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)
-
-        st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, x[:3])
-        ert = ert * st
-
-        binfsc, _, _ = core.fsc.anytwomaps_fsc_covariance(
-            self.e0, ert, self.bin_idx, self.nbin)
-        val_arr = np.zeros((self.nbin, 2), dtype='float')
-        val_arr[:,0] = binfsc #/ (1.0 - binfsc**2)
-        wgrid = fcodes_fast.read_into_grid2(self.bin_idx,
-            val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
+        tp = 2.0 * np.pi
 
         sv = [self.sv[0,:,:,:], self.sv[1,:,:,:], self.sv[2,:,:,:]]
-        dFRS = get_dfs(np.real(np.fft.ifftn(np.fft.ifftshift(ert))), sv, vol)
-        dRdq = derivatives_wrt_q(q)
+        dFRS = get_dfs2(self.ert, self.xyz)
+        #temp = np.gradient(self.ert)
+        #dFRS = np.zeros((nx, ny, nz, 3), 'complex')
+        #for i in range(3):
+        #    dFRS[:,:,:,i] = temp[i]
+            #print('sum: ', np.sum(temp[i]))
+
+        dRdq = derivatives_wrt_q(self.q)
+        #print('dRdq')
+        #print(dRdq)
         df = np.zeros(6, dtype="float")
-        wgrid = 1.0
+        wgrid = self.wgrid #1.0
         for i in range(3):
-            df[i] = -np.sum(np.real(wgrid * np.conjugate(self.e0) * (ert * tpi * self.sv[i,:,:,:]))) / vol
+            df[i] = -np.sum(np.real(wgrid * np.conjugate(self.e0) * (self.ert * tpi * self.sv[i,:,:,:]))) / vol
             a = np.zeros((3, 3), dtype="float")
             for k in range(3):
                 for l in range(3):
@@ -139,17 +180,24 @@ class Bfgs:
                             * np.real(
                                 np.conjugate(self.e0)
                                 * (dFRS[:, :, :, k] * self.sv[l, :, :, :] * dRdq[i, k, l])
+                                #* (dFRS[:, :, :, k] * self.sv[l, :, :, :] * tp * dRdq[i, k, l])
                             )
                         ) 
                     else:
                         a[k, l] = a[l, k]
             df[i+3] = np.sum(a) / vol # divide by vol is to scale
+        #print('derivatives: ')
+        #for i in range(6):
+        #    print(df[i])
         return df
 
     def calc_fsc(self):
         assert self.e0.shape == self.e1.shape == self.bin_idx.shape
         binfsc, _, bincounts = core.fsc.anytwomaps_fsc_covariance(
             self.e0, self.ert, self.bin_idx, self.nbin)
+        # mask all NaNs
+        mask = np.isnan(binfsc)
+        binfsc = np.where(~mask,binfsc,0.)
         self.binfsc = binfsc
         self.avgfsc = utils.get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
 
@@ -166,21 +214,21 @@ class Bfgs:
         step = np.asarray(x[3:], 'float')
         self.q = np.array([1., 0., 0., 0.], 'float') + np.insert(step, 0, 0.0)
         self.q = self.q / np.sqrt(np.dot(self.q, self.q))
+        #print('print self.q: ', self.q)
         rotmat = core.quaternions.get_RM(self.q)
-        ert = maputils.get_FRS(rotmat, self.e1, interp="linear")[:, :, :, 0] # faster
-        #ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat) # slower
+        #ert = maputils.get_FRS(rotmat, self.e1, interp="linear")[:, :, :, 0] # faster, less accurate
+        ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat) # slower
         self.t = x[:3]
         self.ert = ert * fcodes_fast.get_st(nx, ny, nz, self.t)[0]
-        #self.calc_fsc()
-        #self.get_wght()
-        #fval = np.sum(self.wgrid * self.e0 * np.conjugate(self.ert)) / (nx*ny*nz) # divide by vol is to scale
-        fval = np.sum(self.e0 * np.conjugate(self.ert)) / (nx*ny*nz) # divide by vol is to scale
+        self.calc_fsc()
+        #print(self.binfsc)
+        self.get_wght()
+        fval = np.sum(self.wgrid * self.e0 * np.conjugate(self.ert)) / (nx*ny*nz) # divide by vol is to scale
         # print values on display
         rotation = np.arccos((np.trace(rotmat) - 1) / 2) * 180.0 / np.pi
-        t_angstrom = self.t * self.pixsize * np.array([nx, ny, nz], 'float')
+        t_angstrom = self.t * self.pixsize * np.asarray(self.map_dim, 'float')
         translation = np.sqrt(np.dot(t_angstrom, t_angstrom))
-        #print('fval, q, t ', fval.real, self.q, self.t)
-        print("fval, rot, trans: {:6.5f} {:6.4f} {:6.4f}".format(
+        print("fval, rot(deg), trans(A): {:6.5f} {:6.4f} {:6.4f}".format(
                     fval.real, rotation, translation))
         return -fval.real
 
@@ -189,17 +237,47 @@ class Bfgs:
         from scipy.optimize import minimize
         self.ereal_rgi, self.eimag_rgi = get_rgi(self.e1)
         x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 'float')
-        #x = np.zeros(6, 'float')
-        options = {'maxiter': 400}
-        print("Optimization methos: ", self.method)
+        if self.map_dim is None:
+            self.map_dim = self.e1.shape
+        nx, ny, nz = self.e1.shape
+        self.xyz = create_xyz_grid(self.e1.shape)
+        vol = nx * ny * nz
+        tol = 1e-4#vol * 1e-9
+        print('vol= ', vol)
+        print('tol= ', tol)
+        minimize_stopper = MinimizeStopper()
+        options = {'maxiter': 100, 'gtol': tol}
+        print("Optimization method: ", self.method)
         if self.method.lower() == 'nelder-mead':
-            result = minimize(fun=self.functional, x0=x, method='Nelder-Mead', tol=1e-5, options=options)
+            result = minimize(
+                fun=self.functional, 
+                x0=x, 
+                method='Nelder-Mead', 
+                tol=tol, 
+                options=options
+                )
         elif self.method.lower() == 'bfgs':
-            result = minimize(fun=self.functional, x0=x, method='BFGS', jac=self.derivatives, tol=1e-5, options=options)
+            result = minimize(
+                fun=self.functional, 
+                x0=x, 
+                method='BFGS', 
+                jac=self.derivatives, 
+                tol=tol, 
+                #callback=minimize_stopper.__call__,
+                options=options
+                )
         else:
-            result = minimize(fun=self.functional, x0=x, method=self.method, jac=self.derivatives, hess=self.hess_r, tol=1e-5, options=options)    
-        
-        print(result)
+            result = minimize(
+                fun=self.functional, 
+                x0=x, 
+                method=self.method, 
+                jac=self.derivatives, 
+                hess=self.hess_r, 
+                tol=tol, 
+                options=options
+                )    
+        if result.status:
+            print(result)
         print("Final q: ", self.q)  
         print("Final t: ", self.t)
         print("Euler angles: ", np.rad2deg(core.quaternions.rotationMatrixToEulerAngles(core.quaternions.get_RM(self.q))))     
@@ -208,9 +286,6 @@ class Bfgs:
         ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)
         nx, ny, nz = ert.shape
         self.ert = ert * fcodes_fast.get_st(nx, ny, nz, self.t)[0]
-        #from numpy.fft import ifftn, ifftshift
-        #data2write = np.real(ifftshift(ifftn(ifftshift(self.ert))))
-        #mobj = iotools.Map()
 
 
 
