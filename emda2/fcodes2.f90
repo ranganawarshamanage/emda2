@@ -68,32 +68,63 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   print*, 'Creating resolution grid. Please wait...'
 
   ! Friedel's Law
+!!$  do i=xyzmin(1), xyzmax(1)
+!!$     do j=xyzmin(2), xyzmax(2)
+!!$        do k=xyzmin(3), 0
+!!$           call get_resol(uc,real(i),real(j),real(k),resol)
+!!$           s_grid(i,j,k) = 1.0/resol
+!!$           if(k/=xyzmin(3) .and. j/=xyzmin(2) .and. i/=xyzmin(1))then
+!!$              s_grid(-i,-j,-k) = s_grid(i,j,k)
+!!$           end if
+!!$           if(resol < high_res .or. resol > low_res) cycle
+!!$           ! Find the matching bin to resol
+!!$           do ibin = 0, nbin - 1
+!!$              val = sqrt((res_arr(ibin) - resol)**2)
+!!$              if(ibin == 0)then
+!!$                 tmp_val = val; tmp_min = val
+!!$                 mnloc = ibin 
+!!$              else
+!!$                 tmp_val = val
+!!$                 if(tmp_val < tmp_min)then
+!!$                    tmp_min = val
+!!$                    mnloc = ibin
+!!$                 end if
+!!$              end if
+!!$           end do
+!!$           bin_idx(i,j,k) = mnloc
+!!$           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+!!$           bin_idx(-i,-j,-k) = mnloc
+!!$        end do
+!!$     end do
+!!$  end do
+
+  ! Friedel's Law
   do i=xyzmin(1), xyzmax(1)
      do j=xyzmin(2), xyzmax(2)
         do k=xyzmin(3), 0
-           call get_resol(uc,real(i),real(j),real(k),resol)
-           s_grid(i,j,k) = 1.0/resol
            if(k/=xyzmin(3) .and. j/=xyzmin(2) .and. i/=xyzmin(1))then
+              call get_resol(uc,real(i),real(j),real(k),resol)
+              if(resol < high_res .or. resol > low_res) cycle
+              s_grid(i,j,k) = 1.0/resol
               s_grid(-i,-j,-k) = s_grid(i,j,k)
-           end if
-           if(resol < high_res .or. resol > low_res) cycle
-           ! Find the matching bin to resol
-           do ibin = 0, nbin - 1
-              val = sqrt((res_arr(ibin) - resol)**2)
-              if(ibin == 0)then
-                 tmp_val = val; tmp_min = val
-                 mnloc = ibin 
-              else
-                 tmp_val = val
-                 if(tmp_val < tmp_min)then
-                    tmp_min = val
-                    mnloc = ibin
+              ! Find the matching bin to resol
+              do ibin = 0, nbin - 1
+                 val = sqrt((res_arr(ibin) - resol)**2)
+                 if(ibin == 0)then
+                    tmp_val = val; tmp_min = val
+                    mnloc = ibin 
+                 else
+                    tmp_val = val
+                    if(tmp_val < tmp_min)then
+                       tmp_min = val
+                       mnloc = ibin
+                    end if
                  end if
-              end if
-           end do
-           bin_idx(i,j,k) = mnloc
-           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
-           bin_idx(-i,-j,-k) = mnloc
+              end do
+              bin_idx(i,j,k) = mnloc
+              if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+              bin_idx(-i,-j,-k) = mnloc
+           end if
         end do
      end do
   end do
@@ -1186,8 +1217,11 @@ subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
           ((A2_sum(ibin)/bin_arr_count(ibin))**2 + (B2_sum(ibin)/bin_arr_count(ibin))**2)
 
      !bin_sgnl_var(ibin) = F1F2_covar(ibin)
-     bin_fsc(ibin) = F1F2_covar(ibin) / (sqrt(F1_var(ibin)) * sqrt(F2_var(ibin)))
-
+     if((F1_var(ibin) < 1.0e-5) .or. (F2_var(ibin) < 1.0e-5))then
+        bin_fsc(ibin) = 0.0
+     else
+        bin_fsc(ibin) = F1F2_covar(ibin) / (sqrt(F1_var(ibin)) * sqrt(F2_var(ibin)))
+     end if
      if(debug)then
         print*,ibin,F1F2_covar(ibin),F1_var(ibin),F2_var(ibin),bin_fsc(ibin),bin_arr_count(ibin)
      end if
@@ -1633,6 +1667,57 @@ subroutine apply_bfactor_to_map(mapin,Bf_arr,uc,nx,ny,nz,nbf,mode,all_mapout)
   if(debug) print*, 'time for map blurring/sharpening = ', finish-start 
 
 end subroutine apply_bfactor_to_map
+
+subroutine simple_blur(fin,uc,nx,ny,nz,mode,fout)
+  implicit none
+  !
+  real*8, parameter :: PI = 3.141592653589793
+  integer,  intent(in) :: mode,nx,ny,nz
+  real,     dimension(6),                                           intent(in) :: uc
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in) :: fin
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: fout
+  integer :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax
+  real    :: resol,s,start, finish
+  logical :: debug
+  ! locals
+  complex*16 :: xj
+  real*8 :: A, B, D, phi
+  !
+  debug = .FALSE.
+  if(mode == 1) debug = .TRUE.
+
+  fout = dcmplx(0.0d0, 0.0d0)
+  xj = dcmplx(0.0d0,1.0d0)
+
+  call cpu_time(start)
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+  if(debug) print*, '[',xmin,xmax,'],[', ymin,ymax,'],[',zmin,zmax,']'
+
+  print*, 'Simple blur is Fout = Fin/|s|^2'
+  do i=xmin, xmax
+     do j=ymin, ymax
+        do k=zmin, zmax
+           call get_resol(uc,real(i),real(j),real(k),resol)
+           if(resol == 0.0)then
+              print*, i,j,k
+              print*, 'Resol cannot be zero or negative!'
+              stop
+           end if
+           s = 1.0 / resol
+           A = real(fin(i,j,k)); B = imag(fin(i,j,k))
+           phi = atan2(B, A)
+           D = sqrt(A**2 + B**2)
+           D = D / abs(s)
+           fout(i,j,k) = D * exp(xj * phi)
+        end do
+     end do
+  end do
+  call cpu_time(finish)
+  if(debug) print*, 'time for map blurring/sharpening = ', finish-start 
+
+end subroutine simple_blur
 
 
 subroutine tricubic(RM,F,FRS,nc,mode,nx,ny,nz)
@@ -2236,6 +2321,93 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   end do
   return
 end subroutine trilinear
+
+
+subroutine trilinear_cut(RM,F,FRS,ncopies,mode,nx,ny,nz,cx,cy,cz)
+  implicit none
+  real*8,intent(in):: RM(3,3)
+  integer,intent(in):: nx,ny,nz,mode,ncopies,cx,cy,cz
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: F
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: FRS
+  ! locals
+  integer :: x0(3),x1(3)
+  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+  real*8 :: x(3),xd(3),s(3)
+  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+  integer :: h,k,l,i
+  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+
+
+  FRS = dcmplx(0.0d0, 0.0d0)
+  x = 0.0d0
+  xd = 0.0d0
+
+  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+
+  !cxmin = -cx/2; cymin = -cy/2; czmin = -cz/2
+  !cxmax = (cx-2)/2; cymax = (cy-2)/2; czmax = (cz-2)/2
+
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+
+  !write(*,*) nxyz,nxyzmn,nxyzmx
+
+  do l = zmin, zmax
+     do k = ymin, ymax
+        outer: do h = xmin, 0!xmax
+           s(1) = h
+           s(2) = k
+           s(3) = l
+           x = matmul(transpose(RM),s)
+           do i = 1, 3
+              !x(i)  = dot_product(RM(:,i),s) ! Note that RM is now transposed
+              x0(i) = floor(x(i))
+              x1(i) = x0(i) + 1
+              if((nxyzmx(i) < x0(i)) .or. (x0(i) < nxyzmn(i)) &
+                   .or. (nxyzmx(i) < x1(i)) .or. (x1(i) < nxyzmn(i)))then
+                 cycle outer
+              end if
+              xd(i) = (x(i)-real(x0(i)))!/(x1(i)-x0(i))
+              if(abs(xd(i)).gt.1.0) then
+                 print*, 'Something is wrong ',xd(i)
+                 stop
+              endif
+           end do
+           !  Careful here: we may get to the outside of the array
+           do i = 1,3
+              x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
+           enddo
+           do ic = 1, ncopies
+              c000 = F(x0(1),x0(2),x0(3),ic)
+              c001 = F(x0(1),x0(2),x1(3),ic)
+              c010 = F(x0(1),x1(2),x0(3),ic)
+              c011 = F(x0(1),x1(2),x1(3),ic)
+              c100 = F(x1(1),x0(2),x0(3),ic)
+              c101 = F(x1(1),x0(2),x1(3),ic)
+              c110 = F(x1(1),x1(2),x0(3),ic)
+              c111 = F(x1(1),x1(2),x1(3),ic)
+              ! Interpolation along x direction
+              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
+              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
+              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
+              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+              ! Interpolation along y direction
+              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
+              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+              ! Interpolation along z direction
+              c = c0*(1.0d0-xd(3)) + c1*xd(3)
+              FRS(h,k,l,ic) = c
+              if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+              FRS(-h,-k,-l,ic) = conjg(c)
+           end do
+        end do outer
+     end do
+  end do
+  return
+end subroutine trilinear_cut
 
 
 subroutine trilinear_new(RM,uc,F,FRS,highres,nx,ny,nz)
