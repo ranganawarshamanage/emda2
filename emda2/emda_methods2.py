@@ -216,6 +216,11 @@ def mask_from_map_connectedpixels(m1, binthresh=None):
     masklist, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
     return masklist
 
+def mask_from_halfmaps(h1, h2):
+    from emda2.ext.mapmask_using_halfmaps import main
+    masklist = main(h1=h1, h2=h2)
+    return masklist
+
 def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=None, res_arr=None):
     """Lowpass filters a map to a specified resolution.
 
