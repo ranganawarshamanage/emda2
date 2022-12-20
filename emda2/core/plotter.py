@@ -10,7 +10,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 import matplotlib
 
-#matplotlib.use("Agg")
 matplotlib.use(matplotlib.get_backend())
 from matplotlib import pyplot as plt
 
@@ -100,20 +99,16 @@ def plot_line(mapname, res_arr, arr):
 def plot_nlines(
     res_arr,
     list_arr,
-    mapname="halfmap_fsc.eps",
+    mapname="halfmap_fsc",
     curve_label=None,
     fscline=0.143,
     plot_title=None,
 ):
-    # from mpl_toolkits.axes_grid1 import host_subplot
-    # import mpl_toolkits.axisartist as AA
 
     if curve_label is None:
-        #curve_label = ["halfmap_fsc"]
         curve_label = ['series%s'%(i+1) for i in range(len(list_arr))]
     bin_arr = np.arange(len(res_arr))
     fig = plt.figure(figsize=(6, 4))
-    # ax1 = host_subplot(111,axes_class=AA.Axes)
     ax1 = fig.add_subplot(111)
     for icurve in range(len(list_arr)):
         ax1.plot(bin_arr, list_arr[icurve], label=curve_label[icurve], linewidth=2)
@@ -132,15 +127,14 @@ def plot_nlines(
     label_format = '{:5.2f}'
     ax1.xaxis.set_major_locator(mticker.FixedLocator(pos))
     ax1.set_xticklabels([label_format.format(res_arr[x]) for x in pos])
-    #
-    #ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
     ax1.set_xlabel("Resolution ($\AA$)")
     plt.legend(loc=0)
     plt.ylabel("Fourier Shell Correlation")
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
     if plot_title is not None:
         plt.title(plot_title, fontdict=font)
-    plt.savefig(mapname, format="eps", dpi=300)
+    plt.savefig(mapname+'.eps', format="eps", dpi=300)
+    plt.savefig(mapname+'.pdf', format="pdf", dpi=300)
     plt.close()
 
 
