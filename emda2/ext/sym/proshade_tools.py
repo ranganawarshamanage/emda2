@@ -8,7 +8,13 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 # Run codes for proshade
 import numpy as np
-import proshade
+try:
+    import proshade
+except:
+    print("This function requires Proshade, but it is not installed.")
+    print("Please install proshade first and rerun.")
+    print(">>> https://github.com/michaltykac/proshade.git <<<")
+    raise SystemExit()
 
 def proshade_overlay(map1, map2, fitresol=4.0):
     ps                = proshade.ProSHADE_settings()
