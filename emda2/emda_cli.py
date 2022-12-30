@@ -140,7 +140,6 @@ def calc_fsc(args):
                             plot_title="FSC against referencemap")
     except Exception as ex:
         print('Exception Occured!!!')
-        print()
         print(ex)
     
 
