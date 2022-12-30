@@ -4,7 +4,8 @@ import setuptools
 try:
     from numpy.distutils.core import setup, Extension
 except ImportError:
-    print("Numpy is not installed! Please install Numpy first and then try")
+    print("Numpy is not installed! "
+          "Please install Numpy first and then try")
     raise SystemExit()
 
 ex1 = Extension(name = 'fcodes2', 
@@ -27,13 +28,12 @@ setup(name='emda2',
         'pandas>=0.23.4',
         'mrcfile',
         'matplotlib',
-        'numpy',
         'scipy',
         'gemmi',
-        'servalcat',
+        #'servalcat',
         'tabulate',
         'more_itertools',
-        'proshade',
+        #'proshade',
         ],
     ext_modules =[ex1],
     #test_suite='emda.tests',
