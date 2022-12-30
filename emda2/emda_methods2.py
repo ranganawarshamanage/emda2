@@ -724,33 +724,33 @@ def rebox_by_mask(arr, mask, mask_origin, padwidth=10):
         padwidth=padwidth)
     return reboxed_map, reboxed_mask
 
-def get_pointgroup(axlist, orderlist, m1, resol=5.0, fsclim=0.7, fobj=None):
-    """
-    Find point group in EMDA using proshade axes and sym.order lists
-
-    Inputs:
-        axlist: list of rotation axes output by Proshade
-        orderlist: list of symmetry orders correspond with axes in axlist
-        m1: mapobject from EMDA/iotools.Map
-        resol: max. resolution for axis refinement and pointgroup detection
-        fobj: file object for information output 
-
-    Outputs:
-        pg: point group symbol
-    """
-    from emda2.ext.sym import pointgroup
-    results = pointgroup.get_pg(
-        axis_list=axlist, 
-        orderlist=orderlist, 
-        m1=m1, 
-        resol=resol, 
-        fobj=fobj, 
-        fsc_cutoff=fsclim)
-    if len(results) > 0:
-        pg, gen_odrlist, gen_axlist = results
-    else:
-        pg = None
-    return pg
+#def get_pointgroup(axlist, orderlist, m1, resol=5.0, fsclim=0.7, fobj=None):
+#    """
+#    Find point group in EMDA using proshade axes and sym.order lists
+#
+#    Inputs:
+#        axlist: list of rotation axes output by Proshade
+#        orderlist: list of symmetry orders correspond with axes in axlist
+#        m1: mapobject from EMDA/iotools.Map
+#        resol: max. resolution for axis refinement and pointgroup detection
+#        fobj: file object for information output 
+#
+#    Outputs:
+#        pg: point group symbol
+#    """
+#    from emda2.ext.sym import pointgroup
+#    results = pointgroup.get_pg(
+#        axis_list=axlist, 
+#        orderlist=orderlist, 
+#        m1=m1, 
+#        resol=resol, 
+#        fobj=fobj, 
+#        fsc_cutoff=fsclim)
+#    if len(results) > 0:
+#        pg, gen_odrlist, gen_axlist = results
+#    else:
+#        pg = None
+#    return pg
 
 def flip_arr(arr, axis='z'):
     # axis to flip
