@@ -79,7 +79,7 @@ def find_pg(args):
         half1=args.half1,
         mask=args.mask,
         resol=args.resolution,
-        resol4axref=args.resol4ref,
+        resol4axref=args.resol4axref,
     )
 
 def make_mapmask(args):
