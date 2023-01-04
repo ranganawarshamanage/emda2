@@ -44,6 +44,8 @@ pointg.add_argument("--mask", required=True,
                     type=str, help="mask file for half1")
 pointg.add_argument("--resolution", required=True,
                     type=float, help="resolution of half1 (A)")
+pointg.add_argument("--resol4axref", required=False, default=5.,
+                    type=float, help="resolution for axis refinement (5 Angs.)")
 
 # FSC between maps
 calcfsc = subparsers.add_parser(
@@ -77,6 +79,7 @@ def find_pg(args):
         half1=args.half1,
         mask=args.mask,
         resol=args.resolution,
+        resol4axref=args.resol4ref,
     )
 
 def make_mapmask(args):
