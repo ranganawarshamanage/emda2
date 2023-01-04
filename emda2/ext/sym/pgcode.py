@@ -380,11 +380,11 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
         ref_fsclist = []
         ref_tlist = []
         ref_axposlist = []
-        fsclist = [] # FSC up to Nyquist (nbin)
         claimed_res = emmap1.claimed_res 
         cbin = emmap1.claimed_bin 
         initial_t = [0.0, 0.0, 0.0]
         for i, ax in enumerate(axlist):
+            fsclist = [] # FSC up to Nyquist (nbin)
             axis = ax
             order = orderlist[i]
             binfsc, axfsc, frt = calc_fsc(
