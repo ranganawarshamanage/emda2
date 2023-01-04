@@ -39,13 +39,16 @@ def average(fo, axis, fold, t):
 def average2(fo, axes, folds, tlist):
     nx, ny, nz = fo.shape
     i = 1
+    print('symmetry averaging....')
     for axis, t, fold in zip(axes, tlist, folds):
+        print('axis, fold, t: ', axis, fold, t)
         t = -np.asarray(t, 'float') # reverse the translation. 
         st = fcodes2.get_st(nx, ny, nz, t)[0]
         fo = fo*st
         if i == 1: f_sum = fo
         anglist = [float(360*i/fold) for i in range(1, fold)]
         for angle in anglist:
+            print('angle being used: ', angle)
             f_sum += transform(fo, axis, angle)
             i += 1
     return f_sum/i
