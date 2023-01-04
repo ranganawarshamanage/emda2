@@ -191,10 +191,10 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
     mask = kwargs['mask']
     half1 = kwargs['half1']
     half2 = kwargs['half2']
-    if claimed_res < 5:
-        resol4refinement = float(5)
-    else:
+    resol4refinement = kwargs['resol4refinement']
+    if claimed_res > resol4refinement:
         resol4refinement = claimed_res
+    print('Resolution for refinement: ', resol4refinement)
     # select data upto claimed resol
     _, map1 = lowpassmap_butterworth(
         fc=m1.workarr, 
@@ -370,7 +370,7 @@ def get_pg_perlevel(a, axes, folds, level):
     return pglist
 
 
-def main(half1, resol=None, fobj=None, imask=None):
+def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
     if resol is not None:
         resol = resol * 1.1 # taking 10% less resolution of author claimed
     # open halfmaps
@@ -452,6 +452,7 @@ def main(half1, resol=None, fobj=None, imask=None):
             mask=rmask,
             half1=rmap1,
             half2=rmap2,
+            resol4refinement=float(resol4axref),
             )
         print('Proshade PG: ', proshade_pg)
         print('EMDA PG: ', emda_pg)
