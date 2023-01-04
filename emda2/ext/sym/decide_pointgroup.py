@@ -96,9 +96,22 @@ def decide_pointgroup(axeslist, orderlist):
 
         # check for T sym
         ax3 = []
+        ax2 = []
         for i, order in enumerate(orderlist):
             if order == 3:
                 ax3.append(axeslist[i])
+            elif order == 2:
+                ax2.append(axeslist[i])
+        if len(ax3) > 0 and len(ax2) > 0:
+            for axis1 in ax3:
+                for axis2 in ax2:
+                    angle = cosine_angle(axis1, axis2)
+                    if (abs(angle - 54.74) <= ang_tol or 
+                        abs(angle - 125.26) <= ang_tol):
+                        pg = 'T'
+                        return [pg]  
+                    else:
+                        continue
         if len(ax3) >= 2:
             angle = cosine_angle(ax3[0], ax3[1])
             if (abs(angle - 109.47) <= ang_tol or 
