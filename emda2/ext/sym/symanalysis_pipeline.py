@@ -13,7 +13,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 # Compare FSC-full vs FSC-sym
 import numpy as np
 import re, math, os
-from numpy.fft import fftn, ifftn, fftshift
+from numpy.fft import fftn, ifftn, fftshift, ifftshift
 from emda2.core import iotools
 import emda2.emda_methods2 as em
 from emda2.ext.mapmask import mask_from_halfmaps
@@ -43,6 +43,17 @@ def writemap(arr, cell, mapname, origin=None):
     m2.cell = cell
     m2.origin = origin
     m2.write()
+
+def _lowpassmap_butterworth(fclist, sgrid, smax):
+    order = 4  # order of the butterworth filter
+    D = sgrid
+    d = 1.0 / smax # smax in Ansgtrom units
+    # butterworth filter
+    bwfilter = 1.0 / np.sqrt(1 + ((D / d) ** (2 * order)))
+    lw_fclist = []
+    for fc in fclist:
+        lw_fclist.append(fc * bwfilter)
+    return lw_fclist
 
 def is_prime(n):
     """
@@ -181,45 +192,72 @@ def test(emmap1, axes, orders, fscs, fobj=None):
     return pg
 
 
-def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
+def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     res_arr = kwargs['res_arr']
     bin_idx = kwargs['bin_idx']
     nbin = kwargs['nbin']
     sgrid = kwargs['sgrid']
     fobj = kwargs['fobj']
-    fsc_full = kwargs['fsc_full']
+    #fsc_full = kwargs['fsc_full']
     mask = kwargs['mask']
     half1 = kwargs['half1']
     half2 = kwargs['half2']
+    claimed_res = kwargs['claimed_res']
     resol4refinement = kwargs['resol4refinement']
+
+    dist = np.sqrt((res_arr - claimed_res) ** 2)
+    claimed_cbin = np.argmin(dist)
+    if res_arr[claimed_cbin] <= claimed_res:
+        claimed_cbin -= 1
+    claimed_res = res_arr[claimed_cbin]
+    print('Claimed resolution and cbin: ', claimed_res, claimed_cbin)
+
     if claimed_res > resol4refinement:
         resol4refinement = claimed_res
     print('Resolution for refinement: ', resol4refinement)
+    
+    fhf1 = fftshift(fftn(fftshift(half1 * mask)))
+    fhf2 = fftshift(fftn(fftshift(half2 * mask)))
+
     # select data upto claimed resol
-    _, map1 = lowpassmap_butterworth(
-        fc=m1.workarr, 
-        sgrid=sgrid,
-        smax=claimed_res, 
-        order=4)
-    map1 = map1 * mask
-    # using COM
+    print('Lowpass flitering data to claimed resolution %.3f' %claimed_res)
+    fhf1, fhf2 = _lowpassmap_butterworth(
+        fclist=[fhf1, fhf2], sgrid=sgrid, smax=claimed_res)
+    fo = (fhf1 + fhf2) / 2
+    map1 = np.real(ifftshift(ifftn(ifftshift(fo)))) * mask
+    # calculate halfmap FSC
+    binfsc = em.fsc(
+        f1=fhf1, 
+        f2=fhf2, 
+        bin_idx=bin_idx, 
+        nbin=nbin
+        )
+    fsc_full = 2 * binfsc / (1. + binfsc) # fullmap FSC
+    emdalogger.log_string(fobj, 'Halfmap and Fullmap FSCs')
+    emdalogger.log_fsc(
+        fobj,
+        {
+            'Resol.':res_arr,
+            'FSC(hlaf)':binfsc,
+            'FSC(full)':fsc_full
+        }
+    )
+    #for i in range(nbin):
+    #    print(i, res_arr[i], binfsc[i], fsc_full[i])
+
     nx, ny, nz = map1.shape
+    print('Calculating COM of the fullmap ...')
     com = center_of_mass_density(map1)
     box_centr = (nx // 2, ny // 2, nz // 2)
-    map1_com_adjusted = shift_density(map1, np.subtract(box_centr, com))
-    mask_com_adjusted = shift_density(mask, np.subtract(box_centr, com))
-
-    # preparing data for sym. averaging
-    half1masked = half1 * mask
-    half2masked = half2 * mask
-    half1_com_adjusted = shift_density(half1masked, np.subtract(box_centr, com))
-    half2_com_adjusted = shift_density(half2masked, np.subtract(box_centr, com))
-    fhf1 = fftshift(fftn(fftshift(half1_com_adjusted)))
-    fhf2 = fftshift(fftn(fftshift(half2_com_adjusted)))
-    #
-    com = center_of_mass_density(map1_com_adjusted)
-    fo = fftshift(fftn(fftshift(map1_com_adjusted)))
+    # applying translation in Fourier space is faster
+    t = [(box_centr[i] - com[i]) / sh for i, sh in enumerate(map1.shape)]
+    st = fcodes2.get_st(nx, ny, nz, t)[0]
+    fhf1 = st * fhf1
+    fhf2 = st * fhf2
+    fo = st * fo        
+    com = box_centr
     # make NEM
+    print('Normalizing fullmap FCs ...')
     eo = fcodes2.get_normalized_sf_singlemap(
         fo=fo,
         bin_idx=bin_idx,
@@ -229,17 +267,22 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
         )
     fsc_max = np.sqrt(filter_fsc(fsc_full))
     eo = eo * fcodes2.read_into_grid(bin_idx, fsc_max, nbin, nx, ny, nz)
-    #eo = fcodes2.simple_blur(eo, m1.workcell, nx, ny, nz) #simple blurring
-    dist = np.sqrt((res_arr - claimed_res) ** 2)
-    claimed_cbin = np.argmin(dist) + 1  
-    tlist = [[0., 0., 0.] for _ in range(len(axlist))]
-    emmap1 = axis_refinement.EmmapOverlay(arr=map1_com_adjusted)
+    # test output of normalized and weighted map
+    bm = iotools.Map('nem.mrc')
+    bm.arr = np.real(ifftshift(ifftn(ifftshift(eo))))
+    bm.cell = m1.workcell
+    bm.axorder = m1.axorder
+    bm.origin = m1.origin
+    bm.write()
+    print('Preparing object for axis refinement ...')
+    emmap1 = axis_refinement.EmmapOverlay(arr=map1)
+    emmap1.emdbid=kwargs['emdbid']
     emmap1.bin_idx = bin_idx
     emmap1.res_arr = res_arr
     emmap1.nbin = nbin
     emmap1.claimed_res = claimed_res
     emmap1.claimed_bin = claimed_cbin
-    emmap1.mask = mask_com_adjusted
+    #emmap1.mask = mask_com_adjusted
     emmap1.pix = [m1.workcell[i]/sh for i, sh in enumerate(m1.workarr.shape)]
     emmap1.fo_lst = [fo]
     emmap1.eo_lst = [eo]
@@ -247,6 +290,7 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
     emmap1.fitfsc = 0.15
     emmap1.ncycles = 10
     emmap1.fscfull = fsc_full
+    emmap1.fscstar = fsc_max
     emmap1.symdat = []
     emmap1.syminfo = []
     emmap1.com = True
@@ -268,7 +312,6 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
         fscs=fsclist, 
         fobj=fobj,
         )
-
     # validate the pg against fscfull
     emdalogger.log_newline(fobj)
     a = np.zeros((len(emmap1.symdat), len(emmap1.res_arr)))
@@ -293,6 +336,9 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
     for i, res in enumerate(emmap1.res_arr):
         print("{:>6.2f} | {} | {:>6.3f}".format(res, vec2string(a[:,i]), emmap1.fscfull[i]))
         fobj.write("{:>6.2f} | {} | {:>6.3f}\n".format(res, vec2string(a[:,i]), emmap1.fscfull[i]))
+        if i == emmap1.claimed_bin: 
+            print(dash)
+            fobj.write(dash+'\n')
     fobj.write(dash+'\n')
 
     # average symcopies
@@ -334,6 +380,9 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
     for i, res in enumerate(emmap1.res_arr):
         print("{:>6.2f} | {} | {:>6.3f}".format(res, vec2string(b[:,i]), fsc_hf[i]))
         fobj.write("{:>6.2f} | {} | {:>6.3f}\n".format(res, vec2string(b[:,i]), fsc_hf[i]))
+        if i == emmap1.claimed_bin: 
+            print(dash)
+            fobj.write(dash+'\n')
     fobj.write(dash+'\n')
 
     # FSC levels and point groups
@@ -350,6 +399,9 @@ def get_pg(axlist, orderlist, fsclist, m1, claimed_res, **kwargs):
         l = [pglevels[n][i] for n in range(len(pglevels))]
         print(res, list2string(l))
         fobj.write(" %.2f  %s\n" %(res, list2string(l)))
+        if i == emmap1.claimed_bin: 
+            print(dash)
+            fobj.write(dash+'\n')
     return pg
 
 
@@ -384,6 +436,7 @@ def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
 
     m = re.search('emd_(.+)_half', half1)
     logname = 'emd-%s-pointgroup.txt'%m.group(1)
+    emdbid = 'emd-%s'%m.group(1)
     if fobj is None:
         fobj = open(logname, 'w')
     maskname = 'emda_mapmask_emd-'+m.group(1)+'.mrc'
@@ -409,24 +462,9 @@ def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
     newcell = [fullmap.shape[i]*h1.workcell[i]/shp for i, shp in enumerate(h1.workarr.shape)]
     writemap(fullmap, newcell, reboxedmapname)
     writemap(rmask, newcell, reboxedmaskname)
-
     # create resolution grid
     for _ in range(3): newcell.append(90.0)
-    nbin, res_arr, bin_idx, sgrid = em.get_binidx(cell=newcell, arr=rmap1)
-    binfsc = em.fsc(
-        f1=fftshift(fftn(rmap1 * rmask)), 
-        f2=fftshift(fftn(rmap2 * rmask)), 
-        bin_idx=bin_idx, 
-        nbin=nbin
-        )
-    fsc_full = 2 * binfsc / (1. + binfsc)
-    # if resol is not given, find it using FSC
-    if resol is None:
-        ibin = get_ibin(filter_fsc(binfsc), cutoff=0.15)
-        resol = res_arr[ibin]
-        print(binfsc)
-        print('resol: ', resol)
-    
+    nbin, res_arr, bin_idx, sgrid = em.get_binidx(cell=newcell, arr=rmap1)    
     # running proshade
     print('Running Proshade...')
     results = proshade_tools.get_symmops_from_proshade(mapname=reboxedmapname, fobj=fobj)
@@ -438,6 +476,7 @@ def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
         m2.read()
         m2.workarr = m2.workarr * rmask
         emda_pg = get_pg(
+            emdbid=emdbid,
             axlist=axlist, 
             orderlist=orderlist, 
             fsclist=fsclist, 
@@ -447,7 +486,6 @@ def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
             bin_idx=bin_idx,
             nbin=nbin,
             sgrid=sgrid,
-            fsc_full=fsc_full,
             res_arr=res_arr,
             mask=rmask,
             half1=rmap1,
