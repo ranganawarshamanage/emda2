@@ -12,6 +12,7 @@ import sys, re
 import datetime
 import emda2.config
 from emda2.core import iotools, maptools, restools, plotter, fsctools, quaternions
+from numpy.fft import fftshift, ifftshift, fftn, ifftn
 import emda2.emda_methods2 as em
 
 
@@ -71,6 +72,39 @@ mapmask.add_argument("--half2", required=False, default=None,
                     type=str, help="half map 2")
 mapmask.add_argument("--maskname", required=False, default=None,
                     type=str, help="maskname for output")
+
+# apply transformation on map
+maptransform = subparsers.add_parser(
+    'transform',
+    description="apply a transformation on a map"
+)
+maptransform.add_argument("--map", required=True, 
+                    type=str, help="input map (.map/.mrc)")
+maptransform.add_argument("--axis", required=True,
+                    nargs="+", type=float, help="rotation axis")
+maptransform.add_argument("--rotation", required=True, 
+                    type=float, help="rotation in degree")
+maptransform.add_argument("--translation", required=False,
+                    default=[0.0, 0.0, 0.0], nargs="+", type=float,
+                    help="translation vec. in Angstrom. eg 1.0 0.0 0.0")
+maptransform.add_argument("--ibin", required=False,
+                    default=None, type=int,
+                    help="translation vec. in Angstrom. eg 1.0 0.0 0.0")
+maptransform.add_argument("--mapout", required=False, 
+                    default="transformed.mrc", help="output map (mrc/map)")
+
+rotatemap = subparsers.add_parser(
+    'rotatemap',
+    description="apply a rotation on a map"
+)
+rotatemap.add_argument("--map", required=True, 
+                    type=str, help="input map (.map/.mrc)")
+rotatemap.add_argument("--axis", required=True,
+                    nargs="+", type=float, help="rotation axis")
+rotatemap.add_argument("--rotation", required=True, 
+                    type=float, help="rotation in degree")
+rotatemap.add_argument("--mapout", required=False, 
+                    default="rotatedmap_rs.mrc", help="output map (mrc/map)")
 
 
 def find_pg(args):
@@ -145,7 +179,42 @@ def calc_fsc(args):
         print('Exception Occured!!!')
         print(ex)
     
+def apply_transformation(args):
+    # reading the map into EMDA map object
+    m1 = iotools.Map(args.map)
+    m1.read()
+    # combining axis and rotation to generate rotmat
+    rotmat = quaternions.rotmat_from_axisangle(axis=args.axis, 
+        theta=np.deg2rad(args.rotation))
+    frt, newcell = em.apply_transformation(
+        m1=m1,
+        rotmat=rotmat,
+        trans=args.translation,
+        ibin=args.ibin
+    )
+    m2 = iotools.Map(name=args.mapout)
+    m2.arr = np.real(ifftshift(ifftn(ifftshift(frt))))
+    m2.cell = newcell #m1.workcell
+    m2.origin = m1.origin
+    m2.write()
 
+def rotate_map(args):
+    # reading the map into EMDA map object
+    m1 = iotools.Map(args.map)
+    m1.read()
+    # combining axis and rotation to generate rotmat
+    rotmat = quaternions.rotmat_from_axisangle(axis=args.axis, 
+        theta=np.deg2rad(args.rotation))
+    rho = em.rotate_map_realspace(
+        m1=m1,
+        rotmat=rotmat,
+    )
+    # output rotated map
+    m2 = iotools.Map(name=args.mapout)
+    m2.arr = rho
+    m2.cell = m1.workcell
+    m2.origin = m1.origin
+    m2.write()    
 
 
 def main(command_line=None):
@@ -161,6 +230,11 @@ def main(command_line=None):
             make_mapmask(args)    
         if args.command == 'fsc':
             calc_fsc(args)    
+        if args.command == 'transform':
+            apply_transformation(args)
+        if args.command == 'rotatemap':
+            rotate_map(args)
+
             
 
 def emda_commands():
@@ -178,6 +252,8 @@ def emda_commands():
     print('   pointgroup   - detect the point group symmetry of the map')
     print('   fsc          - computes FSC between two maps')
     print('   mapmask      - generates a mask using halfmaps')
+    print('   transform    - apply a transformation on the map (Fourier space)')
+    print('   rotatemap    - apply a rotation on the map (Real space)')
     #print('   info      - output basic information about the map')
     
     #print('   halffsc   - computes FSC between half maps')
