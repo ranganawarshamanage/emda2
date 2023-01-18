@@ -577,10 +577,12 @@ subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz)
   integer, dimension(0:nbin-1),intent(out) :: bin_arr_count
   real*8, dimension(0:nbin-1,0:11) :: bindata
   real*8    :: A1,A2,B1,B2
+  real*8 :: tol
   integer   :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax,ibin,indx
   real      :: start, finish
   logical   :: debug, make_all_zero 
   !
+  tol = 0.000001
   debug = .FALSE.
   make_all_zero = .FALSE.
   if(mode == 1) debug = .TRUE.
@@ -646,7 +648,11 @@ subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz)
      bindata(ibin,11) = (bindata(ibin,8) + bindata(ibin,9))/bin_arr_count(ibin) - &
           ((bindata(ibin,2)/bin_arr_count(ibin))**2 + &
           (bindata(ibin,3)/bin_arr_count(ibin))**2)
-     binstats(ibin,1) = binstats(ibin,0) / (sqrt(bindata(ibin,10)) * sqrt(bindata(ibin,11)))
+     if((bindata(ibin,10) < tol) .or. (bindata(ibin,11) < tol))then
+        binstats(ibin,1) = 0.0
+     else
+        binstats(ibin,1) = binstats(ibin,0) / (sqrt(bindata(ibin,10)) * sqrt(bindata(ibin,11)))
+     end if
      if(debug)then
         print*,ibin,binstats(ibin,0),bindata(ibin,10),bindata(ibin,11), &
              binstats(ibin,1),bin_arr_count(ibin), &
@@ -2248,7 +2254,7 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   ! locals
   integer :: x0(3),x1(3)
   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
-  real*8 :: x(3),xd(3),s(3)
+  real*8 :: x(3),xd(3),s(3),tol,freal,fimag
   complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
   integer :: h,k,l,i
   integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
@@ -2257,6 +2263,7 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   FRS = dcmplx(0.0d0, 0.0d0)
   x = 0.0d0
   xd = 0.0d0
+  tol = 0.000000001
 
   nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
   nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
@@ -2274,6 +2281,13 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
            s(1) = h
            s(2) = k
            s(3) = l
+!!$           if(ncopies == 1)then
+!!$              freal = real(F(h,k,l,1))
+!!$              fimag = aimag(F(h,k,l,1))
+!!$              if(freal < tol .and. fimag < tol)then
+!!$                 cycle outer
+!!$              end if
+!!$           end if
            x = matmul(transpose(RM),s)
            do i = 1, 3
               !x(i)  = dot_product(RM(:,i),s) ! Note that RM is now transposed
@@ -2321,7 +2335,6 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   end do
   return
 end subroutine trilinear
-
 
 subroutine trilinear_cut(RM,F,FRS,ncopies,mode,nx,ny,nz,cx,cy,cz)
   implicit none
@@ -2672,13 +2685,328 @@ subroutine trilinearn(F,RM,ncopies,mode,nx,ny,nz,FRS)
   return
 end subroutine trilinearn
 
+subroutine trilinear_sphere(RM,F,FRS,bin_idx,ncopies,mode,nx,ny,nz,ibin)
+  implicit none
+  real*8,intent(in):: RM(3,3)
+  integer,intent(in):: nx,ny,nz,mode,ncopies,ibin
+  integer,   dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: F
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: FRS
+  ! locals
+  integer :: x0(3),x1(3)
+  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+  real*8 :: x(3),xd(3),s(3)
+  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+  integer :: h,k,l,i
+  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+
+
+  FRS(:,:,:,1) = dcmplx(0.0d0, 0.0d0)
+  x = 0.0d0
+  xd = 0.0d0
+
+  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+
+!!$  xmin = int(-nx/2); xmax = -(xmin+1)
+!!$  ymin = int(-ny/2); ymax = -(ymin+1)
+!!$  zmin = int(-nz/2); zmax = -(zmin+1)
+
+  xmin = int(-nx/2)+1; xmax = -(xmin)
+  ymin = int(-ny/2)+1; ymax = -(ymin)
+  zmin = int(-nz/2)+1; zmax = -(zmin)
+
+  nxyzmn(1) = xmin; nxyzmn(2) = ymin; nxyzmn(3) = zmin
+  nxyzmx(1) = xmax; nxyzmx(2) = ymax; nxyzmx(3) = zmax
+  
+  !write(*,*) nxyz,nxyzmn,nxyzmx
+
+  do l = zmin, zmax
+     do k = ymin, ymax
+        outer: do h = xmin, 0 !xmax
+
+           s(1) = h
+           s(2) = k
+           s(3) = l
+           if(bin_idx(h,k,l) > ibin) cycle
+           x = matmul(transpose(RM),s)
+           x0 = floor(x); x1 = x0 + 1
+           !if(any(x0 .lt. x)) write(*,*)x,x0,'Here is the problem'
+           x0 = min(nxyzmx, max(nxyzmn, x0))
+           x1 = min(nxyzmx, max(nxyzmn, x1))
+           xd = x - real(x0)
+           
+           do ic = 1, ncopies
+              c000 = F(x0(1),x0(2),x0(3),ic)
+              c001 = F(x0(1),x0(2),x1(3),ic)
+              c010 = F(x0(1),x1(2),x0(3),ic)
+              c011 = F(x0(1),x1(2),x1(3),ic)
+              c100 = F(x1(1),x0(2),x0(3),ic)
+              c101 = F(x1(1),x0(2),x1(3),ic)
+              c110 = F(x1(1),x1(2),x0(3),ic)
+              c111 = F(x1(1),x1(2),x1(3),ic)
+              
+              ! Interpolation along x direction
+              c00 = c000 + (c100-c000)*xd(1)
+              c01 = c001 + (c101-c001)*xd(1)
+              c10 = c010 + (c110-c010)*xd(1)
+              c11 = c011 + (c111-c011)*xd(1)
+!!$              c00 = c000*(1.0d0-xd(1)) + c100*xd(1) 
+!!$              c01 = c001*(1.0d0-xd(1)) + c101*xd(1) 
+!!$              c10 = c010*(1.0d0-xd(1)) + c110*xd(1) 
+!!$              c11 = c011*(1.0d0-xd(1)) + c111*xd(1) 
+              
+              ! Interpolation along y direction
+              c0 = c00 + (c10-c00)*xd(2)
+              c1 = c01 + (c11-c01)*xd(2)
+!!$              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)    
+!!$              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)    
+              
+              ! Interpolation along z direction
+              c = c0 + (c1-c0)*xd(3)
+!!$              c = c0*(1.0d0-xd(3)) + c1*xd(3)      
+              
+              FRS(h,k,l,ic) = c
+              !if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+              FRS(-h,-k,-l,ic) = conjg(c)
+           end do
+        end do outer
+     end do
+  end do
+  return
+end subroutine trilinear_sphere
+
+! subroutine trilinear_nrotmat(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,DFRS)
+!   implicit none
+!   integer,intent(in):: nx,ny,nz,mode,ncopies,ibin
+!   real*8,intent(in):: RM(ncopies,3,3)
+!   integer,   dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: bin_idx
+!   complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F!, st
+!   !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: wgrid
+!   !real*8,dimension(2),intent(out):: df
+!   !complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: FRS
+!   complex*16,dimension(2,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: DFRS
+!   complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2):: FRS
+!   ! locals
+!   integer :: x0(3),x1(3)
+!   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+!   real*8 :: x(3),xd(3),s(3)
+!   complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+!   integer :: h,k,l,i
+!   integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+!   real :: start,finish
+! 
+!   FRS = dcmplx(0.0d0, 0.0d0)
+!   DFRS = dcmplx(0.0d0, 0.0d0)
+!   x = 0.0d0
+!   xd = 0.0d0
+! 
+!   nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+!   nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+!   nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+! 
+!   xmin = int(-nx/2); xmax = -(xmin+1)
+!   ymin = int(-ny/2); ymax = -(ymin+1)
+!   zmin = int(-nz/2); zmax = -(zmin+1)
+! 
+!   xmin = -(ibin); xmax = ibin-1
+!   ymin = -(ibin); ymax = ibin-1
+!   zmin = -(ibin); zmax = ibin-1
+!   call cpu_time(start)
+!   do l = zmin, zmax
+!      do k = ymin, ymax
+!         outer: do h = xmin, 0
+!            if(bin_idx(h,k,l) > ibin) cycle
+!            !if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+!            s(1) = h
+!            s(2) = k
+!            s(3) = l
+!            do ic = 1, ncopies
+!               !CALL DGEMM('N', 'N', 3, 1, 3, 1D0, transpose(RM(ic,:,:)), 3, s, 3, 0D0, x, 3)
+!               x = matmul(transpose(RM(ic,:,:)),s)
+!               x0 = floor(x); x1 = x0 + 1
+!               x0 = min(nxyzmx, max(nxyzmn, x0))
+!               x1 = min(nxyzmx, max(nxyzmn, x1))
+!               xd = x - x0
+! 
+!               c000 = F(x0(1),x0(2),x0(3))
+!               c001 = F(x0(1),x0(2),x1(3))
+!               c010 = F(x0(1),x1(2),x0(3))
+!               c011 = F(x0(1),x1(2),x1(3))
+!               c100 = F(x1(1),x0(2),x0(3))
+!               c101 = F(x1(1),x0(2),x1(3))
+!               c110 = F(x1(1),x1(2),x0(3))
+!               c111 = F(x1(1),x1(2),x1(3))
+!               
+!               ! Interpolation along x direction
+!               c00 = c000 + (c100-c000)*xd(1)
+!               c01 = c001 + (c101-c001)*xd(1)
+!               c10 = c010 + (c110-c010)*xd(1)
+!               c11 = c011 + (c111-c011)*xd(1)
+! !!$              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
+! !!$              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
+! !!$              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
+! !!$              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+! 
+!               ! Interpolation along y direction
+!               c0 = c00 + (c10-c00)*xd(2)
+!               c1 = c01 + (c11-c01)*xd(2)
+! !!$              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
+! !!$              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+! 
+!               ! Interpolation along z direction
+!               c = c0 + (c1-c0)*xd(3)
+! !!$              c = c0*(1.0d0-xd(3)) + c1*xd(3)
+! 
+!               FRS(ic,h,k,l) = c
+!               if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+!               FRS(ic,-h,-k,-l) = conjg(c)
+! 
+!            end do
+!         end do outer
+!      end do
+!   end do
+!   call cpu_time(finish)
+!   !print*, 'time for interpolation (s) = ', finish-start
+!   ! numerical derivative calculation
+!   DFRS(1,:,:,:) = FRS(1,:,:,:) - FRS(2,:,:,:)
+!   DFRS(2,:,:,:) = FRS(3,:,:,:) - FRS(4,:,:,:)
+!   return
+! end subroutine trilinear_nrotmat
+
+subroutine trilinear_nrotmat(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,FRS)
+  implicit none
+  integer,intent(in):: nx,ny,nz,mode,ncopies,ibin
+  real*8,intent(in):: RM(ncopies,3,3)
+  integer,   dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: bin_idx
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
+  complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: FRS
+  ! locals
+  integer :: x0(3),x1(3)
+  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+  real*8 :: x(3),xd(3),s(3)
+  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+  integer :: h,k,l,i
+  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+  real :: start,finish
+
+  FRS = dcmplx(0.0d0, 0.0d0)
+  !DFRS = dcmplx(0.0d0, 0.0d0)
+  x = 0.0d0
+  xd = 0.0d0
+
+  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+
+  xmin = -(ibin); xmax = ibin-1
+  ymin = -(ibin); ymax = ibin-1
+  zmin = -(ibin); zmax = ibin-1
+  call cpu_time(start)
+  do l = zmin, zmax
+     do k = ymin, ymax
+        outer: do h = xmin, 0
+           if(bin_idx(h,k,l) > ibin) cycle
+           !if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+           s(1) = h
+           s(2) = k
+           s(3) = l
+           do ic = 1, ncopies
+              !CALL DGEMM('N', 'N', 3, 1, 3, 1D0, transpose(RM(ic,:,:)), 3, s, 3, 0D0, x, 3)
+              x = matmul(transpose(RM(ic,:,:)),s)
+              x0 = floor(x); x1 = x0 + 1
+              x0 = min(nxyzmx, max(nxyzmn, x0))
+              x1 = min(nxyzmx, max(nxyzmn, x1))
+              xd = x - x0
+			  ! reading coefficients
+              c000 = F(x0(1),x0(2),x0(3))
+              c001 = F(x0(1),x0(2),x1(3))
+              c010 = F(x0(1),x1(2),x0(3))
+              c011 = F(x0(1),x1(2),x1(3))
+              c100 = F(x1(1),x0(2),x0(3))
+              c101 = F(x1(1),x0(2),x1(3))
+              c110 = F(x1(1),x1(2),x0(3))
+              c111 = F(x1(1),x1(2),x1(3))
+              ! Interpolation along x direction
+              c00 = c000 + (c100-c000)*xd(1)
+              c01 = c001 + (c101-c001)*xd(1)
+              c10 = c010 + (c110-c010)*xd(1)
+              c11 = c011 + (c111-c011)*xd(1)
+              ! Interpolation along y direction
+              c0 = c00 + (c10-c00)*xd(2)
+              c1 = c01 + (c11-c01)*xd(2)
+              ! Interpolation along z direction
+              c = c0 + (c1-c0)*xd(3)
+              FRS(ic,h,k,l) = c
+              if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+              FRS(ic,-h,-k,-l) = conjg(c)
+           end do
+        end do outer
+     end do
+  end do
+  call cpu_time(finish)
+  !print*, 'time for interpolation (s) = ', finish-start
+  return
+end subroutine trilinear_nrotmat
+
+
+subroutine numberic_derivatives(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,DFRS)
+  implicit none
+  integer,intent(in):: nx,ny,nz,mode,ncopies,ibin
+  real*8,intent(in):: RM(ncopies,3,3)
+  integer,   dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: bin_idx
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
+  complex*16,dimension(2,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: DFRS
+  !local
+  complex*16,dimension(4,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2):: FRS
+  real :: start,finish
+  
+  FRS = dcmplx(0.0d0, 0.0d0)
+  DFRS = dcmplx(0.0d0, 0.0d0)
+  call cpu_time(start)
+  ! calling interpolation
+  call trilinear_nrotmat(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,FRS)
+  ! numerical derivative calculation
+  DFRS(1,:,:,:) = FRS(1,:,:,:) - FRS(2,:,:,:)
+  DFRS(2,:,:,:) = FRS(3,:,:,:) - FRS(4,:,:,:)
+  call cpu_time(finish)
+  !print*, 'time for derivative calculation (s) = ', finish-start
+  return
+end subroutine numberic_derivatives
+                 
+subroutine rotate_and_sum(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,Fsum)
+  implicit none
+  integer,intent(in):: nx,ny,nz,mode,ncopies,ibin
+  real*8,intent(in):: RM(ncopies,3,3)
+  integer,   dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: bin_idx
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: Fsum
+  !local
+  complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2):: FRS
+  real :: start,finish
+  
+  FRS = dcmplx(0.0d0, 0.0d0)
+  Fsum = dcmplx(0.0d0, 0.0d0)
+  call cpu_time(start)
+  ! calling interpolation
+  call trilinear_nrotmat(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,FRS)
+  ! summing maps
+  Fsum = F + SUM(FRS, 1)
+  call cpu_time(finish)
+  !print*, 'time for summation (s) = ', finish-start
+  return
+end subroutine rotate_and_sum
+                 
                  
 subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
   implicit none
   real*8,dimension(3,3),intent(in):: RM
   integer,intent(in):: nx,ny,nz,mode
-  !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: arr1
-  !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: arr2
   real*8,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(in):: arr1
   real*8,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(out):: arr2
   ! locals
@@ -2689,6 +3017,8 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
   real*8 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
   integer :: h,k,l,i
   integer :: xmin,xmax,ymin,ymax,zmin,zmax
+
+  print*, 'Trilinear interpolation in real space...'
 
   debug = .FALSE.
   if(mode == 1) debug = .TRUE.
@@ -2706,64 +3036,36 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
 
   if(debug) write(*,*) nxyz,nxyzmn,nxyzmx
 
-  do h = zmin, zmax
+  do l = zmin, zmax
      do k = ymin, ymax
-        outer: do l = xmin, xmax
+        outer: do h = xmin, xmax
            s(1) = real(h) 
            s(2) = real(k) 
            s(3) = real(l)
-           x = matmul(transpose(RM),s)
-
-           do i = 1, 3
-              x0(i) = floor(x(i))
-              !x0(i) = min(nxyzmx(i),max(nxyzmn(i),x0(i)))
-              x1(i) = x0(i) + 1
-              !x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
-              if((nxyzmx(i) < x0(i)) .or. (x0(i) < nxyzmn(i)) &
-                   .or. (nxyzmx(i) < x1(i)) .or. (x1(i) < nxyzmn(i)))then
-                 cycle outer
-              end if
-              xd(i) = (x(i)-real(x0(i)))!/(x1(i)-x0(i))
-              if(abs(xd(i)).gt.1.0) then
-                 print*, 'Something is wrong ',xd(i)
-                 stop
-              endif
-           end do
-
-           !  Careful here: we may get to the outside of the array
-           do i = 1,3
-              x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
-           enddo
-           !if(k==65) print*, h, k, l, x0, x1
-           !c000 = arr1(x0(1),x0(2),x0(3))
-           !c001 = arr1(x0(1),x0(2),x1(3))
-           !c010 = arr1(x0(1),x1(2),x0(3))
-           !c011 = arr1(x0(1),x1(2),x1(3))
-           !c100 = arr1(x1(1),x0(2),x0(3))
-           !c101 = arr1(x1(1),x0(2),x1(3))
-           !c110 = arr1(x1(1),x1(2),x0(3))
-           !c111 = arr1(x1(1),x1(2),x1(3))
-           c000 = arr1(x0(3),x0(2),x0(1))
-           c001 = arr1(x1(3),x0(2),x0(1))
-           c010 = arr1(x0(3),x1(2),x0(1))
-           c011 = arr1(x1(3),x1(2),x0(1))
-           c100 = arr1(x0(3),x0(2),x1(1))
-           c101 = arr1(x1(3),x0(2),x1(1))
-           c110 = arr1(x0(3),x1(2),x1(1))
-           c111 = arr1(x1(3),x1(2),x1(1))
+           x = matmul(RM,s)
+           x0 = floor(x); x1 = x0 + 1
+           x0 = min(nxyzmx, max(nxyzmn, x0))
+           x1 = min(nxyzmx, max(nxyzmn, x1))
+           xd = x - x0
+           c000 = arr1(x0(1),x0(2),x0(3))
+           c001 = arr1(x0(1),x0(2),x1(3))
+           c010 = arr1(x0(1),x1(2),x0(3))
+           c011 = arr1(x0(1),x1(2),x1(3))
+           c100 = arr1(x1(1),x0(2),x0(3))
+           c101 = arr1(x1(1),x0(2),x1(3))
+           c110 = arr1(x1(1),x1(2),x0(3))
+           c111 = arr1(x1(1),x1(2),x1(3))
            ! Interpolation along x direction
-           c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
-           c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
-           c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
-           c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+           c00 = c000 + (c100-c000)*xd(1)
+           c01 = c001 + (c101-c001)*xd(1)
+           c10 = c010 + (c110-c010)*xd(1)
+           c11 = c011 + (c111-c011)*xd(1)
            ! Interpolation along y direction
-           c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
-           c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+           c0 = c00 + (c10-c00)*xd(2)
+           c1 = c01 + (c11-c01)*xd(2)
            ! Interpolation along z direction
-           c = c0*(1.0d0-xd(3)) + c1*xd(3)
-           !arr2(h,k,l) = c
-           arr2(l,k,h) = c ! 16.09.2020
-           !print*, h, k, l, arr1(h,k,l), arr2(h,k,l)
+           c = c0 + (c1-c0)*xd(3)
+           arr2(h,k,l) = c 
         end do outer
      end do
   end do
