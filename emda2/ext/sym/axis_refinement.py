@@ -14,7 +14,7 @@ from emda2.core import emdalogger
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
 from emda2.core import restools, plotter, iotools, fsctools
 from emda2.ext.utils import (
-    rotate_f, 
+    #rotate_f, 
     shift_density, 
     center_of_mass_density, 
     cut_resolution_for_linefit,
@@ -25,12 +25,25 @@ from emda2.ext.utils import (
 import fcodes2 as fc
 from emda2.core import fsctools
 from math import cos, sin, sqrt, acos, atan2
+from emda2.ext.bfgs import get_rgi, get_f
+from timeit import default_timer as timer
 
 def vec2string(vec):
     return " ".join(("% .3f" % x for x in vec))
 
 def combinestring(vec):
     return "-".join(("%.3f" % x for x in vec))
+
+def plot_fscs():
+    # local plot mimicking plotter.plot_nlines
+    pass
+
+def rotate_f(rm, f, bin_idx, ibin):
+    if len(f.shape) == 3:
+        f = np.expand_dims(f, axis=3)
+    nx, ny, nz, ncopies = f.shape
+    frs = fc.trilinear_sphere(rm,f,bin_idx,0,ibin,ncopies,nx,ny,nz)
+    return frs
 
 def ax2spherical(ax):
     ax = np.asarray(ax, 'float')
@@ -227,6 +240,7 @@ class Bfgs:
         self.method = "BFGS"
         self.e0 = None
         self.e1 = None
+        self.st = None
         self.mask = None
         self.ax_init = None
         self.ax_final = None
@@ -237,26 +251,26 @@ class Bfgs:
         self.pixsize = None
         self.angle = None
         self.q = np.array([1., 0., 0., 0.], 'float')
-        self.t_init = None #np.array([0., 0., 0.], 'float')
+        self.t_init = None
         self.t = None
         self.xyz = None
         self.xyz_sum = None
         self.vol = None
         self.bin_idx = None
         self.binfsc = None
+        self.afsc = None
         self.nbin = None
+        self.ibin = None
         self.fobj = None
 
     def calc_fsc(self):
         assert self.e0.shape == self.e1.shape == self.bin_idx.shape
-        # apply mask on self.e1 to remove aliasing 
-        #map2 = (ifftshift((ifftn(ifftshift(self.e1))).real)) * self.mask
-        #frt = fftshift(fftn(fftshift(map2)))
-        #binfsc, _, bincounts = fsctools.anytwomaps_fsc_covariance(
-        #    self.e0, frt, self.bin_idx, self.nbin)
         binfsc, _, bincounts = fsctools.anytwomaps_fsc_covariance(
             self.e0, self.e1, self.bin_idx, self.nbin)
         self.binfsc = binfsc
+        # weighted average
+        vals, counts = binfsc[:self.ibin], bincounts[:self.ibin]
+        self.afsc = np.sum(vals * counts) / np.sum(counts)
 
     def get_wght(self): 
         nz, ny, nx = self.e0.shape
@@ -266,34 +280,33 @@ class Bfgs:
             val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
 
     def numeric_deri(self, x, info):
-        # 1st and 2nd derivative from finite difference
-        from emda2.ext.bfgs import get_f
+        # 1st derivative from finite difference central formula
         wgrid = 1.0
         nx, ny, nz = self.e0.shape
         df = np.zeros(5, dtype="float") # Jacobian
-        self.ddf = np.zeros((5,5), dtype="float") # Hessian
         tpi = (2.0 * np.pi * 1j)
-        df = np.zeros(5, dtype="float")
         for i in range(3):
             df[i] = -np.sum(np.real(wgrid * np.conjugate(self.e0) * (self.e1 * tpi * self.sv[i,:,:,:])))
-        dphi = 1/(2*nx)
-        rotmat_f, _, _ = rotmat_spherical_crd(phi=self.phi+dphi, thet=self.thet, angle=self.angle)
-        rotmat_b, _, _ = rotmat_spherical_crd(phi=self.phi-dphi, thet=self.thet, angle=self.angle)
-        e1f_dphi = self.st * get_f(self.e0, self.ereal_rgi, self.eimag_rgi, rotmat_f)
-        e1b_dphi = self.st * get_f(self.e0, self.ereal_rgi, self.eimag_rgi, rotmat_b)
-        dFdphi = (e1f_dphi - e1b_dphi) / (2*dphi)
+        dphi = dthet = 1/(2*nx)
+        rm_f1, _, _ = rotmat_spherical_crd(phi=self.phi+dphi, thet=self.thet, angle=self.angle)
+        rm_b1, _, _ = rotmat_spherical_crd(phi=self.phi-dphi, thet=self.thet, angle=self.angle)
+        rm_f2, _, _ = rotmat_spherical_crd(phi=self.phi, thet=self.thet+dthet, angle=self.angle)
+        rm_b2, _, _ = rotmat_spherical_crd(phi=self.phi, thet=self.thet-dthet, angle=self.angle)
+        t1 = timer()
+        dfrs = fc.numberic_derivatives(
+            self.e0, 
+            self.bin_idx,
+            np.stack([rm_f1, rm_b1, rm_f2, rm_b2], axis=0),
+            0,
+            self.ibin,
+            4,
+            nx,ny,nz
+            )
+        #print('time for interpolation total: ', timer()-t1)
+        dFdphi = self.st * dfrs[0,:,:,:] / (2*dphi)
         df[3] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(dFdphi)))
-        ddFddphi = (e1b_dphi - 2*self.e1 + e1f_dphi) / (dphi**2)
-        self.ddf[3,3] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(ddFddphi)))
-        dthet  = 1/(2*nx)
-        rotmat_f, _, _ = rotmat_spherical_crd(phi=self.phi, thet=self.thet+dthet, angle=self.angle)
-        rotmat_b, _, _ = rotmat_spherical_crd(phi=self.phi, thet=self.thet-dthet, angle=self.angle)
-        e1f_dthet = self.st * get_f(self.e0, self.ereal_rgi, self.eimag_rgi, rotmat_f)
-        e1b_dthet = self.st * get_f(self.e0, self.ereal_rgi, self.eimag_rgi, rotmat_b)
-        dFdthet = (e1f_dthet - e1b_dthet) / (2*dthet)
+        dFdthet = self.st * dfrs[1,:,:,:] / (2*dthet)
         df[4] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(dFdthet)))
-        ddFddthet = (e1b_dthet - 2*self.e1 + e1f_dthet) / (dthet**2)
-        self.ddf[4,4] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(ddFddthet))) 
         return df
     
     def secondd(self, x, info):
@@ -394,7 +407,6 @@ class Bfgs:
         pass
 
     def functional(self, x, info):
-        from emda2.ext.bfgs import get_f
         nx, ny, nz = self.e0.shape
         t = np.asarray(self.t_init, 'float') + x[:3]
         self.st = fc.get_st(nx, ny, nz, t)[0]
@@ -404,19 +416,16 @@ class Bfgs:
         self.rotmat, _, _ = rotmat_spherical_crd(
             phi=self.phi, thet=self.thet, angle=self.angle)
         ax = spherical2ax(phi=self.phi, thet=self.thet)
-        self.e1 = self.st * get_f(
-            self.e0, self.ereal_rgi, self.eimag_rgi, self.rotmat)
+        self.e1 = self.st * rotate_f(self.rotmat, self.e0, self.bin_idx, self.ibin)[:, :, :, 0]
         self.calc_fsc()
         self.get_wght()
         fval = np.sum(self.wgrid * self.e0 * np.conjugate(self.e1))
-        tt = [nx*t[0], ny*t[1], nz*t[2]]
-        t2 = np.asarray(tt, 'float') * np.asarray(self.pixsize)
-        afsc = np.average(self.binfsc)
-        print('cycle, fval, afsc, ax, trans ', info['Nfeval'], fval.real, afsc, ax, t2)
+        t2 = np.asarray([nx*t[0], ny*t[1], nz*t[2]], 'float') * np.asarray(self.pixsize)
+        print('cycle, fval, afsc, ax, trans ', info['Nfeval'], fval.real, self.afsc, ax, t2)
         self.fobj.write('cycle=%i, fval=%.3f, afsc=%.3f, ax=%s, trans=%s\n' %(
             info['Nfeval'], 
             fval.real, 
-            afsc, 
+            self.afsc, 
             vec2string(ax), 
             vec2string(t2), 
             ))
@@ -425,19 +434,21 @@ class Bfgs:
 
     def optimize(self):
         from scipy.optimize import minimize
-        from emda2.ext.bfgs import get_rgi
         self.xyz = create_xyz_grid(self.e0.shape)
         grid2 = create_xyz_grid2(self.e0.shape)
         self.sv = np.stack(grid2, axis = 0)
+        nx, ny, nz = self.e0.shape
+        t = np.array([0., 0., 0.], 'float')
+        self.st = fc.get_st(nx, ny, nz, t)[0]
         tol = 1e-4
         self.phi = self.phi0
         self.thet = self.thet0
-        self.ereal_rgi, self.eimag_rgi = get_rgi(self.e0)
         print('initial values of phi, theta, angle:')
         print(self.phi0, self.thet0, self.angle)
         x = np.array([0., 0., 0., 0., 0.], 'float')
         options = {'maxiter':2000}
         args=({'Nfeval':0},)
+        self.method = 'L-BFGS-B'
         print("Optimization method: ", self.method)
         self.fobj.write("Optimization method: %s\n" %self.method)
         result = minimize(
@@ -445,7 +456,7 @@ class Bfgs:
             x0=x, 
             method=self.method,
             jac=self.numeric_deri,
-            hess=self.secondd,
+            #hess=self.secondd,
             tol=tol,
             options=options,  
             args=args,
@@ -459,22 +470,29 @@ class Bfgs:
         self.phi = self.phi0 + result.x[3]
         self.thet = self.thet0 + result.x[4]        
 
-
-def fsc_between_static_and_transfomed_map(emmap1, rm, t):
+def fsc_between_static_and_transfomed_map(emmap1, rm, t, ergi=None, ibin=None):
+    print('RM for FSC calculation')
+    print(rm)
+    print('t: ', t)
     fo=emmap1.fo_lst[0]
+    eo = fo
+    #eo=emmap1.eo_lst[0]
     bin_idx=emmap1.bin_idx
     nbin=emmap1.nbin
-    mask=emmap1.mask
-    fo = emmap1.fo_lst[0]
-    nx, ny, nz = fo.shape
+    if ibin is None: ibin = nbin
+    nx, ny, nz = eo.shape
     st, _, _, _ = fc.get_st(nx, ny, nz, t)
-    frt = st * rotate_f(rm, fo, interp="linear")[:, :, :, 0]
-    # apply mask on rotated and translated map to remove aliasing
-    map2 = (ifftshift((ifftn(ifftshift(frt))).real)) * mask
-    frt = fftshift(fftn(fftshift(map2)))
+    if ergi is not None:
+        ert = st * get_f(eo, ergi[0], ergi[1], rm)
+    else:
+        # test - 1st translate then rotate
+        map2 = (ifftshift((ifftn(ifftshift(st * eo))).real))
+        # rotate in real space
+        map2 = fc.trilinear_map(rm, map2, 0, nx, ny, nz)
+    ert = fftshift(fftn(fftshift(map2)))
     f1f2_fsc = fsctools.anytwomaps_fsc_covariance(
-        fo, frt, bin_idx, nbin)[0]
-    return f1f2_fsc, frt
+        eo, ert, bin_idx, nbin)[0]
+    return f1f2_fsc, ert
 
 
 def run_fit(
@@ -504,6 +522,7 @@ def run_fit(
     fsc_lst = []
     is_abandon = False
     final_t = t
+
     try:
         for i in range(emmap1.ncycles):
             if i == 0:
@@ -512,15 +531,6 @@ def run_fit(
                     rm=rotmat,
                     t=t,
                 )
-                # output axis, order and initial FSC for logging
-                #emdalogger.log_vector(
-                #    fobj, 
-                #    {
-                #        'Initial axis':initial_axis,
-                #        'Initial trans':initial_t,
-                #        'Order':int(2*np.pi/angle)
-                #        }
-                #)
                 # output FSC between static and initial sym. copy
                 emdalogger.log_string(fobj, 'FSC between static and initial copy')
                 emdalogger.log_fsc(
@@ -532,7 +542,7 @@ def run_fit(
                 )
                 emdalogger.log_newline(fobj)
                 ang = float(180/np.pi * angle)
-                output_mapname = 'rotated_ax_'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
+                output_mapname = emmap1.emdbid+'_rotated_ax_'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
                 emdalogger.log_string(fobj, 'writing out %s'%output_mapname)
                 transformedmap = np.real(ifftshift(ifftn(ifftshift(frt))))
                 tm1 = iotools.Map(output_mapname)
@@ -556,7 +566,7 @@ def run_fit(
                 ibin = get_ibin(filter_fsc(f1f2_fsc), cutoff=emmap1.fitfsc)
                 ibin_old = ibin
                 if ibin >= 5:
-                    if fitbin < ibin:
+                    if fitbin <= ibin:
                         ibin = fitbin
                     ibin_old = ibin
                     emdalogger.log_string(fobj, "Fitting starts at %s (A)" %(emmap1.res_arr[ibin]))
@@ -567,7 +577,7 @@ def run_fit(
                 f1f2_fsc, frt = fsc_between_static_and_transfomed_map(
                     emmap1=emmap1,
                     rm=rotmat,
-                    t=t
+                    t=t,
                 )          
                 ibin = get_ibin(filter_fsc(f1f2_fsc), cutoff=emmap1.fitfsc)
                 if fitbin < ibin:
@@ -588,43 +598,44 @@ def run_fit(
                          'StartFSC':fsc_bef,
                          'EndFSC':fsc_aft}
                     )
-                    plotname = 'fsc_ax'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".eps"
+                    plotname = emmap1.emdbid+'_fsc_ax'+combinestring(initial_axis)+"_ang"+str(round(ang,2))
                     emdalogger.log_newline(fobj)
                     emdalogger.log_string(
                         fobj,
                         'Plotting FSCs to %s'%plotname
                     )
+                    # plotting Proshade axis, EMDA axis FSCs with fullmap FSC
                     plotter.plot_nlines(
-                        res_arr=res_arr, 
-                        list_arr=[fsc_lst[0][:ibin_old], fsc_lst[1][:ibin_old]], 
-                        curve_label=["Proshade axis", "EMDA axis"], 
+                        res_arr=emmap1.res_arr, 
+                        list_arr=[fsc_lst[0], fsc_lst[1], emmap1.fscfull],
+                        curve_label=["Proshade axis", "EMDA axis", "Fullmap FSC"], 
                         plot_title="FSC based on Symmetry axis", 
                         fscline=1.,
-                        mapname=plotname)
+                        mapname=plotname,
+                        linecolor=['red', 'green', 'black'],
+                        verticleline=emmap1.claimed_bin,
+                        multicolor=True,
+                        )                    
                     emdalogger.log_string(
                         fobj, 'Outputting static_map.mrc'
                     )
                     stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.fo_lst[0]))))
+                    #stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.eo_lst[0]))))
                     stm = iotools.Map('static_map.mrc')
                     stm.arr = stmap
                     stm.cell = emmap1.map_unit_cell
                     stm.origin = [0,0,0]
                     stm.write()
-                    fittedmapname = 'fitted_ax'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
+                    fittedmapname = emmap1.emdbid+'_fitted_ax'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
                     emdalogger.log_string(
                         fobj, 'Outputting %s'%fittedmapname
                     )
                     transformedmap = np.real(ifftshift(ifftn(ifftshift(frt))))
                     tm = iotools.Map(fittedmapname)
-                    tm.arr = transformedmap * emmap1.mask
+                    tm.arr = transformedmap
                     tm.cell = emmap1.map_unit_cell
                     tm.origin = [0,0,0]
-                    tm.write()  
-                    tm = iotools.Map('mask_applied.mrc')
-                    tm.arr = emmap1.mask
-                    tm.cell = emmap1.map_unit_cell
-                    tm.origin = [0,0,0]
-                    tm.write()    
+                    tm.write()     
                     break
                 elif ibin_old > ibin:
                     is_abandon = True
@@ -646,43 +657,16 @@ def run_fit(
                 fcut, cBIdx, cbin = cut_resolution_for_linefit(
                     e_list, emmap1.bin_idx, emmap1.res_arr, ibin
                 )
-                """ # output cutmap for testing
-                testname = 'test1_map_%s.mrc' % i
-                testmap = np.real(ifftshift(ifftn(ifftshift(fcut[0, :, :, :]))))
-                cell1 = [emmap1.pix[j] * sh for j, sh in enumerate(testmap.shape)]
-                test1 = iotools.Map(testname)
-                test1.arr = testmap
-                test1.cell = emmap1.map_unit_cell #cell1 + [90., 90., 90.]
-                test1.origin = [0,0,0]
-                test1.write()
-                # TODO - 
-                # it seems that the mask should be resampled to the cut dims
-                # It can be used then for FSC calculation during refinement.
-                # That may help to reduce aliasing problems
-                targt_pix = [emmap1.map_unit_cell[i]/sh for i, sh in enumerate(fcut[0, :, :, :].shape)]
-                resampled_mask = iotools.resample2staticmap(
-                    curnt_pix=emmap1.pix, 
-                    targt_pix=targt_pix, 
-                    targt_dim=fcut[0, :, :, :].shape, 
-                    arr=emmap1.mask,
-                    )
-                test2 = iotools.Map('resampled_mask.map')
-                test2.arr = resampled_mask
-                test2.cell = emmap1.map_unit_cell #cell1 + [90., 90., 90.]
-                test2.origin = [0,0,0]
-                test2.write() """                
-
-                static_cutmap = fcut[1, :, :, :]  # use Eo for fitting.
                 bfgs = Bfgs()
                 bfgs.fobj = fobj
                 bfgs.phi0 = phi
                 bfgs.thet0 = thet
                 bfgs.angle = angle
                 bfgs.t_init = t
-                bfgs.e0 = static_cutmap
-                #bfgs.mask = resampled_mask
-                bfgs.bin_idx = cBIdx
-                bfgs.nbin = cbin
+                bfgs.e0 = fcut[1, :, :, :] #static_cutmap
+                bfgs.bin_idx = cBIdx #emmap1.bin_idx 
+                bfgs.nbin = cbin #emmap1.nbin#cbin
+                bfgs.ibin = ibin
                 bfgs.pixsize = emmap1.pix
                 bfgs.method = optmethod
                 bfgs.optimize()
