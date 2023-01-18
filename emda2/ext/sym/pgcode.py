@@ -66,28 +66,16 @@ def calc_fsc(emmap1, axis, angle, t=None, fobj=None):
     if t is None:
         t = np.array([0., 0., 0.], 'float')
     try:
-        t = np.asarray(t, 'float')       
-        """ f_transformed = maptools.transform_f(
-            flist=[fo],
-            axis=axis,
-            translation=t,
-            angle=angle
-        )
-        map2 = (ifftshift((ifftn(ifftshift(f_transformed[0]))).real)) * emmap1.mask
-        frt = fftshift(fftn(fftshift(map2))) """
-
-        # note that first translate then rotate.
         nx, ny, nz = fo.shape
-        t = -t # reverse the direction
+        t = -np.asarray(t, 'float')  # reverse the direction
         st = fcodes2.get_st(nx, ny, nz, t)[0]
         rotmat = get_rotmat_from_axisangle(axis, angle)
-        fo = fo*st # new fo is now at the rotation center
-        frt = rotate_f(rotmat, fo, interp="linear")[:, :, :, 0]
+        # NOTE - first translate then rotate.
+        frt = rotate_f(rotmat, fo*st, interp="linear")[:, :, :, 0]
         fsc = fsctools.anytwomaps_fsc_covariance(
             fo, frt, bin_idx, nbin)[0]
-        #avg_fsc = np.average(fsc[:cbin])
-        avg_fsc = fsc[cbin] # test
-        return [fsc, avg_fsc, frt]
+        ax_fsc = fsc[cbin] # sym. FSC @ claimed resol.
+        return [fsc, ax_fsc, frt]
     except:
         if fobj is not None:
             fobj.write(traceback.format_exc())
@@ -259,7 +247,7 @@ def check_maxorder(params):
                 '   Axis: %s   Order: %s   FSC: % .3f' %
                     (vec2string(refined_axis), current_order, fsc)
             )
-            if fsc < 0.9:
+            if fsc < pg_decide_fsc:
                 bestorder = true_order_list[np.argmax(true_fsc_list)]
                 bestorder_fsc = max(true_fsc_list)
             else:
@@ -376,16 +364,15 @@ def translation_refinement(emmap1, axis, order, fobj, t=None):
 
 def refine_ax(emmap1, axlist, orderlist, fobj):
     try:
-        ref_axlist = []
-        ref_fsclist = []
-        ref_tlist = []
-        ref_axposlist = []
+        ref_axlist = [] # refined axes
+        ref_fsclist = [] # fscs @ claimed resol. of refined axes
+        ref_tlist = []  # refined translations
+        ref_axposlist = [] # refined axes positions
         claimed_res = emmap1.claimed_res 
-        cbin = emmap1.claimed_bin 
+        cbin = emmap1.claimed_bin # bin corresponding to claimed resol.
         initial_t = [0.0, 0.0, 0.0]
-        for i, ax in enumerate(axlist):
+        for i, axis in enumerate(axlist):
             fsclist = [] # FSC up to Nyquist (nbin)
-            axis = ax
             order = orderlist[i]
             binfsc, axfsc, frt = calc_fsc(
                 emmap1=emmap1,
@@ -422,7 +409,6 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
                 emdalogger.log_string(
                     fobj,'FSC: % .3f @ % .2f (A)' %(axfsc, claimed_res)
                 )
-                initial_t = [0.0, 0.0, 0.0]
                 results = axis_refinement.axis_refine(
                     emmap1=emmap1,
                     rotaxis=axis,
@@ -434,11 +420,9 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
             ax_fnl, t_fnl, ax_position, binfsc_refax = results
             ref_axlist.append(ax_fnl)
 
-            #fsc_refined_ax1 = np.average(binfsc_refax[:cbin])
-            fsc_refined_ax1 = binfsc_refax[cbin] # test
+            fsc_refined_ax1 = binfsc_refax[cbin] # refined FSC @ claimed resol.
 
-            # determine the t_centroid for refined axis and this order
-            # collect them in symdat
+            # determine the t_centroid for refined axis and current order
             result = [abs(t_fnl[i]*emmap1.map_dim[i]*emmap1.pix[i]) < 0.05 for i in range(3)]
             if all(result):
                 t_centroid = t_fnl
@@ -446,13 +430,12 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
                 t_centroid = [elem/2 for elem in t_fnl]
             else:
                 t_centroid = get_t_to_centroid(emmap1=emmap1, axis=ax_fnl, order=order)
+            # collect results in symdat
             emmap1.symdat.append([[order],ax_fnl,list(binfsc_refax),t_centroid])
             pos_ax = [
                 (emmap1.com1[i] - t_centroid[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
             ref_axposlist.append(pos_ax)
             ref_tlist.append(t_centroid)
-
-
             fsclist.append(binfsc_refax)
             ref_fsclist.append(fsc_refined_ax1)
             emdalogger.log_string(
