@@ -8,6 +8,7 @@ Copyright - R. Warshamanage and G. N. Murshudov
 from emda2.core import iotools, maptools, restools, fsctools
 import fcodes2
 import numpy as np
+from numpy.fft import fftshift, ifftshift, fftn, ifftn
 
 debug_mode = 0
 
@@ -105,50 +106,50 @@ def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin, filename=None):
     )
     return bin_fsc
 
-def mask_from_halfmaps(uc, half1, half2, radius=4, iter=1, dthresh=None):
-    """Generates a mask from half maps.
-
-    Generates a mask from half maps based on real space local correlation.
-
-    Arguments:
-        Inputs:
-            uc: float, 1D array
-                Unit cell parameters.
-            half1: float, 3D array
-                Half map 1 data.
-            half2: float, 3D array
-                Half map 2 data.
-            radius: integer, optional
-                Radius of integrating kernel in voxels. Default is 4.
-            iter: integer,optional
-                Number of dilation cycles. Default is 1 cycle.
-            dthresh: float, optional
-                The halfmap densities will be thresholded at this value prior
-                calculating local correlation. If the value is not given,
-                EMDA takes this values as the value at which the cumulative
-                density probability is 0.99. This is the default. However,
-                it is recommomded that this value should be supplied
-                by the user and proven to be useful for cases those have
-                micellular densities around protein.
-                
-
-        Outputs:
-            mask: float, 3D array
-                3D Numpy array of correlation mask.
-    """
-    from emda2.ext import maskmap_class
-    #from ext import maskmap_class
-
-    arr1, arr2 = half1, half2
-    obj_maskmap = maskmap_class.MaskedMaps()
-    obj_maskmap.smax = radius
-    obj_maskmap.arr1 = arr1
-    obj_maskmap.arr2 = arr2
-    obj_maskmap.uc = uc
-    obj_maskmap.iter = iter
-    obj_maskmap.dthresh = dthresh
-    obj_maskmap.generate_mask()
-    return obj_maskmap.mask
+#def mask_from_halfmaps(uc, half1, half2, radius=4, iter=1, dthresh=None):
+#    """Generates a mask from half maps.
+#
+#    Generates a mask from half maps based on real space local correlation.
+#
+#    Arguments:
+#        Inputs:
+#            uc: float, 1D array
+#                Unit cell parameters.
+#            half1: float, 3D array
+#                Half map 1 data.
+#            half2: float, 3D array
+#                Half map 2 data.
+#            radius: integer, optional
+#                Radius of integrating kernel in voxels. Default is 4.
+#            iter: integer,optional
+#                Number of dilation cycles. Default is 1 cycle.
+#            dthresh: float, optional
+#                The halfmap densities will be thresholded at this value prior
+#                calculating local correlation. If the value is not given,
+#                EMDA takes this values as the value at which the cumulative
+#                density probability is 0.99. This is the default. However,
+#                it is recommomded that this value should be supplied
+#                by the user and proven to be useful for cases those have
+#                micellular densities around protein.
+#                
+#
+#        Outputs:
+#            mask: float, 3D array
+#                3D Numpy array of correlation mask.
+#    """
+#    from emda2.ext import maskmap_class
+#    #from ext import maskmap_class
+#
+#    arr1, arr2 = half1, half2
+#    obj_maskmap = maskmap_class.MaskedMaps()
+#    obj_maskmap.smax = radius
+#    obj_maskmap.arr1 = arr1
+#    obj_maskmap.arr2 = arr2
+#    obj_maskmap.uc = uc
+#    obj_maskmap.iter = iter
+#    obj_maskmap.dthresh = dthresh
+#    obj_maskmap.generate_mask()
+#    return obj_maskmap.mask
 
 def mask_from_map(
     uc,
@@ -216,10 +217,11 @@ def mask_from_map_connectedpixels(m1, binthresh=None):
     masklist, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
     return masklist
 
-def mask_from_halfmaps(h1, h2):
+""" Old routine"""
+""" def mask_from_halfmaps(h1, h2):
     from emda2.ext.mapmask_using_halfmaps import main
     masklist = main(h1=h1, h2=h2)
-    return masklist
+    return masklist """
 
 def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=None, res_arr=None):
     """Lowpass filters a map to a specified resolution.
@@ -767,6 +769,89 @@ def get_pointgroup(half1, mask, resol4axref=float(5), resol=None):
     results = main(half1=half1, imask=mask, resol=resol, resol4axref=resol4axref)
     return results
     
+def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
+    """
+    This method applys a translaformation (rotation, translation)
+    on the map.
+
+    Inputs:
+        m1: mapobject from EMDA/iotools.Map
+        rotmat: rotation matrix to apply
+        trans: translation to apply (Angstroms)
+        ibin: 
+
+    Outputs:
+        transformed Fourier coefficients
+    """
+    if rotmat is not None or trans is not None:
+        if newdim is None: newdim = m1.workarr.shape[0]
+        if newdim != m1.workarr.shape[0]:
+            current_pixsize = m1.workcell[0] / m1.workarr.shape[0]
+            newarr = iotools.resample2staticmap(
+                curnt_pix=[current_pixsize for _ in range(3)],
+                targt_pix=[current_pixsize for _ in range(3)],
+                targt_dim=[newdim, newdim, newdim],
+                arr=m1.workarr,
+            )
+            cell = [current_pixsize*newdim for _ in range(3)]
+            for _ in range(3): cell.append(0.)
+            f1 = fftshift(fftn(fftshift(newarr)))
+        else:
+            cell = m1.workcell
+            f1 = fftshift(fftn(fftshift(m1.workarr)))
+
+        if rotmat is not None:
+            print('rotamt:')
+            print(rotmat)
+            # check for identity rotation
+            #if((rotmat.shape[0] == rotmat.shape[1]) and 
+            #    np.allclose(rotmat, np.eye(rotmat.shape[0]))):
+            nbin, res_arr, bin_idx, sgrid = get_binidx(
+                cell=cell, arr=f1)
+            f1 = np.expand_dims(f1, axis=3)
+            nx, ny, nz, ncopies = f1.shape
+            if ibin is None: ibin = nbin
+            frs = fcodes2.trilinear_sphere(
+                rotmat,f1,bin_idx,0,ibin,ncopies,nx,ny,nz)[:,:,:,0]
+            if trans is not None:
+                print('translation: ', trans)
+                assert len(trans) == 3
+                t = [trans[i]/m1.workcell[i] for i in range(3)]
+                st = fcodes2.get_st(nx, ny, nz, t)[0]
+                return st * frs, cell
+            else:
+                return frs, cell
+        if rotmat is None and trans is not None:
+            assert len(trans) == 3
+            t = [trans[i]/m1.workcell[i] for i in range(3)]
+            st = fcodes2.get_st(nx, ny, nz, t)[0]
+            return st * f1, m1.workcell
+        # test
+        """ from emda2.ext.bfgs import get_rgi, get_f
+        ereal_rgi, eimag_rgi = get_rgi(f1)
+        frs = get_f(f1, ereal_rgi, eimag_rgi, rotmat)
+        return frs """
+    else:
+        raise SystemExit('No transformation is given!')
+
+
+def rotate_map_realspace(m1, rotmat=None, threshold=None):
+    print('rotamt:')
+    print(rotmat)
+    if threshold is not None:
+        arr = m1.workarr * (m1.workarr > threshold)
+    else:
+        arr = m1.workarr
+    nx, ny, nz = m1.workarr.shape
+    transformed_map = fcodes2.trilinear_map(
+        rotmat, arr, 0, nx, ny, nz)
+    return transformed_map
+
+
+def mask_from_halfmaps(h1, h2, emdbid='rhovar'):
+    import emda2.ext.mapmask_using_halfmaps as hfmask
+    mask = hfmask.main(h1=h1, h2=h2, emdbid=emdbid)
+    return [mask]
 
 
 if __name__=="__main__":
