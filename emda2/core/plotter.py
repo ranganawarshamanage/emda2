@@ -103,22 +103,97 @@ def plot_nlines(
     curve_label=None,
     fscline=0.143,
     plot_title=None,
+    **kwargs
 ):
 
+    if 'linecolor' in kwargs: linecolors = kwargs['linecolor']
+    if 'verticleline' in kwargs: 
+        vl = kwargs['verticleline']
+    else:
+        vl = None
+    multicolor = False
+    if 'multicolor' in kwargs:
+        multicolor = True
     if curve_label is None:
         curve_label = ['series%s'%(i+1) for i in range(len(list_arr))]
     bin_arr = np.arange(len(res_arr))
     fig = plt.figure(figsize=(6, 4))
     ax1 = fig.add_subplot(111)
-    for icurve in range(len(list_arr)):
-        ax1.plot(bin_arr, list_arr[icurve], label=curve_label[icurve], linewidth=2)
-    xmin = np.min(bin_arr)
-    xmax = np.max(bin_arr)
+    if multicolor:
+        # multicolor plots
+        try:
+            for icurve in range(len(list_arr)):
+                ax1.plot(
+                    bin_arr[:int(vl)+1], 
+                    list_arr[icurve][:int(vl)+1], 
+                    label=curve_label[icurve],
+                    color=linecolors[icurve], 
+                    linewidth=2,
+                    )  
+        except:  
+            for icurve in range(len(list_arr)):
+                ax1.plot(
+                    bin_arr[:int(vl)+1], 
+                    list_arr[icurve][:int(vl)+1], 
+                    label=curve_label[icurve], 
+                    linewidth=2,
+                    ) 
+        try:
+            for icurve in range(len(list_arr)):
+                ax1.plot(
+                    bin_arr, 
+                    list_arr[icurve], 
+                    label='_'+curve_label[icurve], # YES, this "_" hides the label
+                    color=linecolors[icurve], 
+                    linewidth=2,
+                    alpha=0.3
+                    )  
+        except:  
+            for icurve in range(len(list_arr)):
+                ax1.plot(
+                    bin_arr, 
+                    list_arr[icurve], 
+                    label='_'+curve_label[icurve], 
+                    linewidth=2,
+                    alpha=0.3
+                    )
+    else:
+        # single color plots
+        try:
+            for icurve in range(len(list_arr)):
+                ax1.plot(
+                    bin_arr, 
+                    list_arr[icurve], 
+                    label=curve_label[icurve],
+                    color=linecolors[icurve], 
+                    linewidth=2,
+                    )  
+        except:  
+            for icurve in range(len(list_arr)):
+                ax1.plot(
+                    bin_arr, 
+                    list_arr[icurve], 
+                    label=curve_label[icurve], 
+                    linewidth=2,
+                    )         
+    xmin, xmax = np.min(bin_arr), np.max(bin_arr)
     plt.plot(
-        (xmin, xmax), (float(fscline), float(fscline)), color="gray", linestyle=":"
-    )
-    plt.plot((xmin, xmax), (0.0, 0.0), color="black", linestyle=":")
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
+        (xmin, xmax), 
+        (float(fscline), float(fscline)), 
+        color="gray", linestyle=":", linewidth=1
+        )
+    plt.plot(
+        (xmin, xmax), 
+        (0.0, 0.0), 
+        color="black", linestyle=":", linewidth=1
+        )
+    if vl is not None:
+        plt.plot(
+            (int(vl), int(vl)), 
+            (0.0, 1.0), 
+            color="black", linestyle="solid", linewidth=0.5
+            )       
+    pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
@@ -130,10 +205,10 @@ def plot_nlines(
     ax1.set_xlabel("Resolution ($\AA$)")
     plt.legend(loc=0)
     plt.ylabel("Fourier Shell Correlation")
-    font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
+    font = {"family": "serif", "color": "black", "weight": "bold", "size": 10}
     if plot_title is not None:
         plt.title(plot_title, fontdict=font)
-    plt.savefig(mapname+'.eps', format="eps", dpi=300)
+    #plt.savefig(mapname+'.eps', format="eps", dpi=300)
     plt.savefig(mapname+'.pdf', format="pdf", dpi=300)
     plt.close()
 
