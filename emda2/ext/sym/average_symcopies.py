@@ -26,17 +26,35 @@ def transform(fo, axis, angle):
     return rotate_f(rotmat, fo, interp="linear")[:, :, :, 0]
 
 
-def average(fo, axis, fold, t):
+def average(fo, axis, fold, t, **kwargs):
+    # average over one axis and its angles
     nx, ny, nz = fo.shape
     st = fcodes2.get_st(nx, ny, nz, t)[0]
     fo = fo*st
-    f_sum = fo
     anglist = [float(360*i/fold) for i in range(1, fold)]
-    for angle in anglist:
-        f_sum += transform(fo, axis, angle)
+    print('axis, fold, t: ', axis, fold, t)
+    # fortran call
+    if 'bin_idx' in kwargs and 'ibin' in kwargs:
+        bin_idx = kwargs['bin_idx']
+        ibin = kwargs['ibin']
+        nrotmats = [quaternions.rotmat_from_axisangle(axis, np.deg2rad(ang)) for ang in anglist]
+        f_sum = fcodes2.rotate_and_sum(
+            fo, 
+            bin_idx,
+            np.stack(nrotmats, axis=0),
+            0,
+            ibin,
+            len(nrotmats),
+            nx,ny,nz
+            )
+    else:
+        f_sum = fo
+        for angle in anglist:
+            f_sum += transform(fo, axis, angle)        
     return f_sum/fold
 
 def average2(fo, axes, folds, tlist):
+    # Average over all axes and angles
     nx, ny, nz = fo.shape
     i = 1
     print('symmetry averaging....')
@@ -54,20 +72,25 @@ def average2(fo, axes, folds, tlist):
     return f_sum/i
 
 def main(f_list, axes, folds, tlist, **kwargs):
-    fhf1_avg = average2(fo=f_list[0], axes=axes, tlist=tlist, folds=folds)
-    fhf2_avg = average2(fo=f_list[1], axes=axes, tlist=tlist, folds=folds)
-    #fhf1_avg = average(fo=f_list[0], axis=axes[0], fold=folds[0], t=tlist[0])    
-    #fhf2_avg = average(fo=f_list[1], axis=axes[0], fold=folds[0], t=tlist[0])
-    # compute FSC
+    #fhf1_avg = average2(fo=f_list[0], axes=axes, tlist=tlist, folds=folds)
+    #fhf2_avg = average2(fo=f_list[1], axes=axes, tlist=tlist, folds=folds)
+
     bin_idx = kwargs['bin_idx']
     nbin = kwargs['nbin']
-
+    print('symmetry averaging of halfmap 1 ....')
+    fhf1_avg = average(fo=f_list[0], 
+        axis=axes[0], fold=folds[0], t=tlist[0],bin_idx=bin_idx, ibin=nbin) 
+    print('symmetry averaging of halfmap 2 ....')   
+    fhf2_avg = average(fo=f_list[1], 
+        axis=axes[0], fold=folds[0], t=tlist[0],bin_idx=bin_idx, ibin=nbin)
+    # compute FSC
+    print('computing FSC between sym. averaged halves ....')
     binfsc1 = fsctools.anytwomaps_fsc_covariance(
             f_list[0], f_list[1], bin_idx, nbin)[0]
     binfsc2 = fsctools.anytwomaps_fsc_covariance(
             fhf1_avg, fhf2_avg, bin_idx, nbin)[0]
         
-    return binfsc1, binfsc2#, fhf1_avg
+    return binfsc1, binfsc2
 
 
 
