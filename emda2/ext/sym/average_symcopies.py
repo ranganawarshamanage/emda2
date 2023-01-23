@@ -6,6 +6,7 @@ This software is released under the
 Mozilla Public License, version 2.0; see LICENSE.
 """
 
+import sys
 import numpy as np
 import fcodes2
 from emda2.core import quaternions, fsctools, restools, iotools, plotter
@@ -29,12 +30,21 @@ def transform(fo, axis, angle):
 def average(fo, axis, fold, t, **kwargs):
     # average over one axis and its angles
     nx, ny, nz = fo.shape
+    t = -np.asarray(t, 'float') # reverse the translation. 
     st = fcodes2.get_st(nx, ny, nz, t)[0]
     fo = fo*st
     anglist = [float(360*i/fold) for i in range(1, fold)]
     print('axis, fold, t: ', axis, fold, t)
-    # fortran call
-    if 'bin_idx' in kwargs and 'ibin' in kwargs:
+    # check the size and decide the method
+    size_GB = fold * sys.getsizeof(fo) / (1024 * 1024 * 1024)
+    print('Size of arrays= %.2f GB'%size_GB)
+    if size_GB > 2.0:
+        # switch to single mode
+        f_sum = fo
+        for angle in anglist:
+            print('angle being used: ', angle)
+            f_sum += transform(fo, axis, angle) 
+    elif 'bin_idx' in kwargs and 'ibin' in kwargs:
         bin_idx = kwargs['bin_idx']
         ibin = kwargs['ibin']
         nrotmats = [quaternions.rotmat_from_axisangle(axis, np.deg2rad(ang)) for ang in anglist]
@@ -50,6 +60,7 @@ def average(fo, axis, fold, t, **kwargs):
     else:
         f_sum = fo
         for angle in anglist:
+            print('angle being used: ', angle)
             f_sum += transform(fo, axis, angle)        
     return f_sum/fold
 
