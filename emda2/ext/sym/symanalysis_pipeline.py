@@ -168,6 +168,15 @@ def test(emmap1, axes, orders, fscs, fobj=None):
     emdalogger.log_string(fobj, "\n        Detecting Pointgroup        ")
     emdalogger.log_string(fobj, '--------------------------------------')
 
+    pg = pgcode.check_for_cyclic_only(
+        emmap1=emmap1, 
+        axes=prime_axlist, 
+        orders=prime_orderlist, 
+        fscs=prime_fsclist, 
+        fobj=fobj)
+    if pg is not None:
+        return pg
+
     pg = 'C1'
     if len(sorder5ax) > 0:
         axes = [sorder5ax, sorder3ax, sorder2ax, sordernax]
@@ -204,6 +213,9 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     half2 = kwargs['half2']
     claimed_res = kwargs['claimed_res']
     resol4refinement = kwargs['resol4refinement']
+    output_maps = kwargs['output_maps']
+
+    pg_decide_fsc = 0.9
 
     dist = np.sqrt((res_arr - claimed_res) ** 2)
     claimed_cbin = np.argmin(dist)
@@ -238,13 +250,10 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
         fobj,
         {
             'Resol.':res_arr,
-            'FSC(hlaf)':binfsc,
+            'FSC(half)':binfsc,
             'FSC(full)':fsc_full
         }
     )
-    #for i in range(nbin):
-    #    print(i, res_arr[i], binfsc[i], fsc_full[i])
-
     nx, ny, nz = map1.shape
     print('Calculating COM of the fullmap ...')
     com = center_of_mass_density(map1)
@@ -268,12 +277,13 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     fsc_max = np.sqrt(filter_fsc(fsc_full))
     eo = eo * fcodes2.read_into_grid(bin_idx, fsc_max, nbin, nx, ny, nz)
     # test output of normalized and weighted map
-    bm = iotools.Map('nem.mrc')
-    bm.arr = np.real(ifftshift(ifftn(ifftshift(eo))))
-    bm.cell = m1.workcell
-    bm.axorder = m1.axorder
-    bm.origin = m1.origin
-    bm.write()
+    if output_maps:
+        bm = iotools.Map('nem.mrc')
+        bm.arr = np.real(ifftshift(ifftn(ifftshift(eo))))
+        bm.cell = m1.workcell
+        bm.axorder = m1.axorder
+        bm.origin = m1.origin
+        bm.write()
     print('Preparing object for axis refinement ...')
     emmap1 = axis_refinement.EmmapOverlay(arr=map1)
     emmap1.emdbid=kwargs['emdbid']
@@ -297,6 +307,7 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     emmap1.com1 = com
     emmap1.map_dim = eo.shape
     emmap1.map_unit_cell = m1.workcell
+    emmap1.output_maps = output_maps # bool
     emdalogger.log_vector(
         fobj, 
         {'Centre of Mass [x, y, z] (pixel units)':list(com)})
@@ -351,41 +362,53 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
           'symmetry averaged halfmap-FSC per axis (FSCs)\n')
     axes, folds, tlist = [], [], []
     fsclist = []
-
     for i, row in enumerate(emmap1.symdat):
-        fold, axis, t = row[0], row[1], row[3]
-        axes.append(axis)
-        folds.append(fold[0])
-        fsc_hf, fsc_symhf = avgsym.main(
-            f_list=[fhf1, fhf2], 
-            axes=[axis], 
-            folds=fold, 
-            tlist=[t], 
-            bin_idx=emmap1.bin_idx,
-            nbin=emmap1.nbin)
-        fsclist.append(fsc_symhf)
+        fold, axis, binfsc, t = row[0], row[1], row[2], row[3]
+        if binfsc[emmap1.claimed_bin] >= pg_decide_fsc:
+            axes.append(axis)
+            folds.append(fold[0])
+            fsc_hf, fsc_symhf = avgsym.main(
+                f_list=[fhf1, fhf2], 
+                axes=[axis], 
+                folds=fold, 
+                tlist=[t], 
+                bin_idx=emmap1.bin_idx,
+                nbin=emmap1.nbin)
+            fsclist.append(fsc_symhf)
     # printing fscs
-    b = np.zeros((len(axes), len(emmap1.res_arr)), 'float')
-    for i in range(len(axes)):
-        b[i,:] = fsclist[i]
-        l = 'ax'+str(i+1) + ': ' + vec2string(axes[i]) + ' Order: ' + str(folds[i])
-        print(l)
-    print(dash)
-    fobj.write(dash+'\n')
-    line1 = "  res  | " + " "*((m-4)//2) + "FSCs" + " "*((m-4)//2) + " |  FSCh "
-    print(line1)
-    fobj.write(line1+'\n')
-    print(dash)
-    fobj.write(dash+'\n')
-    for i, res in enumerate(emmap1.res_arr):
-        print("{:>6.2f} | {} | {:>6.3f}".format(res, vec2string(b[:,i]), fsc_hf[i]))
-        fobj.write("{:>6.2f} | {} | {:>6.3f}\n".format(res, vec2string(b[:,i]), fsc_hf[i]))
-        if i == emmap1.claimed_bin: 
-            print(dash)
-            fobj.write(dash+'\n')
-    fobj.write(dash+'\n')
+    if len(axes) > 0:
+        b = np.zeros((len(axes), len(emmap1.res_arr)), 'float')
+        for i in range(len(axes)):
+            b[i,:] = fsclist[i]
+            l = 'ax'+str(i+1) + ': ' + vec2string(axes[i]) + ' Order: ' + str(folds[i])
+            print(l)
+        print(dash)
+        fobj.write(dash+'\n')
+        line1 = "  res  | " + " "*((m-4)//2) + "FSCs" + " "*((m-4)//2) + " |  FSCh "
+        print(line1)
+        fobj.write(line1+'\n')
+        print(dash)
+        fobj.write(dash+'\n')
+        for i, res in enumerate(emmap1.res_arr):
+            print("{:>6.2f} | {} | {:>6.3f}".format(res, vec2string(b[:,i]), fsc_hf[i]))
+            fobj.write("{:>6.2f} | {} | {:>6.3f}\n".format(res, vec2string(b[:,i]), fsc_hf[i]))
+            if i == emmap1.claimed_bin: 
+                print(dash)
+                fobj.write(dash+'\n')
+        fobj.write(dash+'\n')
+    else:
+        print('---- None of the axis has FSC_sym >= %s @ %.2f A'%(pg_decide_fsc, emmap1.claimed_res))
+        fobj.write(
+            '---- None of the axis has FSC_sym >= %s @ %.2f A\n'%(pg_decide_fsc, emmap1.claimed_res))
+        fobj.write(dash+'\n')
 
     # FSC levels and point groups
+    axes, folds = [], []
+    fsclist = []
+    for i, row in enumerate(emmap1.symdat):
+        fold, axis = row[0], row[1]
+        folds.append(fold[0])
+        axes.append(axis)
     print()
     print("****** Pointgroup at different resolutions ******")
     fobj.write("****** Pointgroup at different resolutions ******\n")
@@ -407,7 +430,6 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
 
 def get_pg_perlevel(a, axes, folds, level):
     pglist = []
-    #print('levle=', level)
     for i in range(a.shape[1]):
         mask = (a[:,i] >= level)
         axlist = []
@@ -417,12 +439,11 @@ def get_pg_perlevel(a, axes, folds, level):
                 axlist.append(ax)
                 orderlist.append(folds[j])
         pg = decide_pointgroup(axlist, orderlist)[0]
-        #print(i, mask, level, pg)
         pglist.append(pg)    
     return pglist
 
 
-def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
+def main(half1, resol4axref=5., output_maps=True, resol=None, fobj=None, imask=None):
     if resol is not None:
         resol = resol * 1.1 # taking 10% less resolution of author claimed
     # open halfmaps
@@ -491,6 +512,7 @@ def main(half1, resol4axref=5., resol=None, fobj=None, imask=None):
             half1=rmap1,
             half2=rmap2,
             resol4refinement=float(resol4axref),
+            output_maps = output_maps,
             )
         print('Proshade PG: ', proshade_pg)
         print('EMDA PG: ', emda_pg)
@@ -523,7 +545,12 @@ def my_func(emdbid):
                 logfile = open(filename, "w")
                 logfile.write("\nEMD-{} {} {}\n".format(emdbid, resol, pg))
                 final_results = main(
-                    half1=half1, resol=float(resol), fobj=logfile, imask=maskfile)
+                    half1=half1, 
+                    resol=float(resol), 
+                    fobj=logfile, 
+                    imask=maskfile, 
+                    output_maps=False,
+                    )
                 if len(final_results) == 4:
                     proshade_pg = final_results[0]
                     emda_pg = final_results[1]
