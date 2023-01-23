@@ -448,7 +448,7 @@ class Bfgs:
         x = np.array([0., 0., 0., 0., 0.], 'float')
         options = {'maxiter':2000}
         args=({'Nfeval':0},)
-        self.method = 'L-BFGS-B'
+        #self.method = 'L-BFGS-B'
         print("Optimization method: ", self.method)
         self.fobj.write("Optimization method: %s\n" %self.method)
         result = minimize(
@@ -474,6 +474,7 @@ def fsc_between_static_and_transfomed_map(emmap1, rm, t, ergi=None, ibin=None):
     print('RM for FSC calculation')
     print(rm)
     print('t: ', t)
+    t = -np.asarray(t, 'float')
     fo=emmap1.fo_lst[0]
     eo = fo
     #eo=emmap1.eo_lst[0]
@@ -542,14 +543,15 @@ def run_fit(
                 )
                 emdalogger.log_newline(fobj)
                 ang = float(180/np.pi * angle)
-                output_mapname = emmap1.emdbid+'_rotated_ax_'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
-                emdalogger.log_string(fobj, 'writing out %s'%output_mapname)
-                transformedmap = np.real(ifftshift(ifftn(ifftshift(frt))))
-                tm1 = iotools.Map(output_mapname)
-                tm1.arr = transformedmap
-                tm1.cell = emmap1.map_unit_cell
-                tm1.origin = [0,0,0]
-                tm1.write()
+                if emmap1.output_maps:
+                    output_mapname = emmap1.emdbid+'_rotated_ax_'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
+                    emdalogger.log_string(fobj, 'writing out %s'%output_mapname)
+                    transformedmap = np.real(ifftshift(ifftn(ifftshift(frt))))
+                    tm1 = iotools.Map(output_mapname)
+                    tm1.arr = transformedmap
+                    tm1.cell = emmap1.map_unit_cell
+                    tm1.origin = [0,0,0]
+                    tm1.write()
                 fsc_lst.append(f1f2_fsc)
                 if emmap1.fitfsc > 0.999:
                     emdalogger.log_string(
@@ -615,27 +617,28 @@ def run_fit(
                         linecolor=['red', 'green', 'black'],
                         verticleline=emmap1.claimed_bin,
                         multicolor=True,
-                        )                    
-                    emdalogger.log_string(
-                        fobj, 'Outputting static_map.mrc'
-                    )
-                    stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.fo_lst[0]))))
-                    #stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.eo_lst[0]))))
-                    stm = iotools.Map('static_map.mrc')
-                    stm.arr = stmap
-                    stm.cell = emmap1.map_unit_cell
-                    stm.origin = [0,0,0]
-                    stm.write()
-                    fittedmapname = emmap1.emdbid+'_fitted_ax'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
-                    emdalogger.log_string(
-                        fobj, 'Outputting %s'%fittedmapname
-                    )
-                    transformedmap = np.real(ifftshift(ifftn(ifftshift(frt))))
-                    tm = iotools.Map(fittedmapname)
-                    tm.arr = transformedmap
-                    tm.cell = emmap1.map_unit_cell
-                    tm.origin = [0,0,0]
-                    tm.write()     
+                        )
+                    if emmap1.output_maps:                    
+                        emdalogger.log_string(
+                            fobj, 'Outputting static_map.mrc'
+                        )
+                        stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.fo_lst[0]))))
+                        #stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.eo_lst[0]))))
+                        stm = iotools.Map('static_map.mrc')
+                        stm.arr = stmap
+                        stm.cell = emmap1.map_unit_cell
+                        stm.origin = [0,0,0]
+                        stm.write()
+                        fittedmapname = emmap1.emdbid+'_fitted_ax'+combinestring(initial_axis)+"_ang"+str(round(ang,2))+".mrc"
+                        emdalogger.log_string(
+                            fobj, 'Outputting %s'%fittedmapname
+                        )
+                        transformedmap = np.real(ifftshift(ifftn(ifftshift(frt))))
+                        tm = iotools.Map(fittedmapname)
+                        tm.arr = transformedmap
+                        tm.cell = emmap1.map_unit_cell
+                        tm.origin = [0,0,0]
+                        tm.write()     
                     break
                 elif ibin_old > ibin:
                     is_abandon = True
@@ -704,7 +707,7 @@ def axis_refine(
     symorder,
     t_init=[0.0, 0.0, 0.0],
     fobj=None,
-    optmethod='BFGS',
+    optmethod='L-BFGS-B',
     **kwargs
 ):
     #frt = kwargs['frt']
