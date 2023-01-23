@@ -22,6 +22,14 @@ def decide_pointgroup(axeslist, orderlist):
     order1 = order2 = 0
     ang_tol = 1.0  # Degrees
 
+    if len(axeslist) == 0:
+        return ['C1']
+
+    if len(axeslist) == 1:
+        # options - Cyclic symmetries
+        pg = 'C' + str(orderlist[0])
+        return [pg]
+
     if len(axeslist) == 2:
         # options - I, O, T, D
         angle = cosine_angle(axeslist[0], axeslist[1])
@@ -59,14 +67,6 @@ def decide_pointgroup(axeslist, orderlist):
         else:
             pg = 'Unknown'
         return [pg]
-    
-    if len(axeslist) == 1:
-        # options - Cyclic symmetries
-        pg = 'C' + str(orderlist[0])
-        return [pg]
-
-    if len(axeslist) == 0:
-        return ['C1']
 
     if len(axeslist) > 2:
         orderlist, axeslist = sort_together([orderlist, axeslist], reverse=True)
@@ -95,8 +95,7 @@ def decide_pointgroup(axeslist, orderlist):
                 return [pg]
 
         # check for T sym
-        ax3 = []
-        ax2 = []
+        ax2, ax3 = [], []
         for i, order in enumerate(orderlist):
             if order == 3:
                 ax3.append(axeslist[i])
@@ -124,12 +123,17 @@ def decide_pointgroup(axeslist, orderlist):
         for i, order in enumerate(orderlist):
             if order == 2:
                 ax2.append(axeslist[i])
-        for i, order in enumerate(orderlist):
-            if order > 2:
-                angle = cosine_angle(axeslist[i], ax2[0])
-                if abs(angle - 90.0) < ang_tol:
-                    pg = 'D' + str(order)
-                    return [pg]
+        if len(ax2) > 0:
+            temp_order_list = []
+            for i, order in enumerate(orderlist):
+                if order > 2:
+                    angle = cosine_angle(axeslist[i], ax2[0])
+                    if abs(angle - 90.0) < ang_tol:
+                        temp_order_list.append(order)
+            if len(temp_order_list) > 0:
+                maxorder = max(temp_order_list)
+                pg = 'D' + str(maxorder)
+                return [pg]
         if len(ax2) >= 2:
             angle = cosine_angle(ax2[0], ax2[1])
             if abs(angle - 90.0) < ang_tol:
@@ -137,7 +141,22 @@ def decide_pointgroup(axeslist, orderlist):
                 return [pg]
 
         # check for C sym
-        pg = 'C' + str(orderlist[0]) 
+        ax1 = axeslist[0]
+        mask = [True]
+        for i, ax in enumerate(axeslist[1:]):
+            angle = cosine_angle(ax1, ax)
+            if angle < ang_tol or (180. - angle) < ang_tol:
+                mask.append(True)
+            else:
+                mask.append(False)
+        if all(mask):
+            order = max(orderlist)
+            if order >= 360:
+                pg = 'Ukwn'
+            else:
+                pg = 'C%s'%order
+        else:
+            pg = 'Unknown'
         return [pg]   
 
 
