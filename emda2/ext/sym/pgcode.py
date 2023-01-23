@@ -57,8 +57,9 @@ def get_rotmat_from_axisangle(axis, angle):
     rotmat = quaternions.get_RM(q)
     return rotmat
 
-def calc_fsc(emmap1, axis, angle, t=None, fobj=None):
-    fo = emmap1.fo_lst[0]
+def calc_fsc(emmap1, axis, angle, t=None, fobj=None, fo=None):
+    if fo is None:
+        fo = emmap1.fo_lst[0]
     bin_idx = emmap1.bin_idx
     nbin = emmap1.nbin
     cbin = emmap1.claimed_bin
@@ -127,6 +128,7 @@ def get_axorder(emmap1, refined_axis, order_list, fobj=None, t=None):
     try:
         true_order_list = []
         true_fsc_list = []
+        print('cleaned order_list: ', order_list)
         for order in order_list:
             current_odr1 = order
             exponent = 1
@@ -622,6 +624,60 @@ def five_folds(emmap1, axes, sordern, fscs, fobj):
             emmap1=emmap1, axes=axes, sordern=sordern, fscs=fscs, fobj=fobj)
     return pg
 
+def check_for_cyclic_only(emmap1, axes, orders, fscs, fobj):
+    # to be cyclic, there should be only one axis
+    # but there can be more than one primitive order
+    #axes = [axis for sublist in axes for axis in sublist]
+    #orders = [order for sublist in orders for order in sublist]
+    #fscs = [fsc for sublist in fscs for fsc in sublist]
+    sfscs, sorders, saxes = sort_together([fscs, orders, axes], reverse=True)
+    # only one axis?
+    mask = [True]
+    for axis in saxes[1:]:
+        angle = cosine_angle(saxes[0], axis)
+        if angle <= ang_tol_p or (180. - angle) <= ang_tol_p:
+            mask.append(True)
+        else:
+            mask.append(False)
+    if all(mask):
+        # only one axis, so it should be cyclic
+        # refine the main axis
+        refinement_results = refine_ax(
+            emmap1=emmap1,
+            axlist=[saxes[0]],
+            orderlist=[sorders[0]],
+            fobj=fobj,
+        )    
+        if refinement_results is not None:
+            (ref_axlist,
+             ref_tlist,
+             _,_,
+             ref_fsclist) = refinement_results
+            refined_main_axis = ref_axlist[0]
+            fsc_refined_axis = ref_fsclist[0]
+            t_centroid = ref_tlist[0]
+            if fsc_refined_axis > pg_decide_fsc:
+                emdalogger.log_string(
+                    fobj,
+                    '%s-fold is real. Checking for C...' %sorders[0] 
+                )
+                refined_t = ref_tlist[0]
+                # get the best order of main axis
+                mainax_bestorder, mainax_bestorder_fsc = get_axorder(
+                        emmap1=emmap1,
+                        refined_axis=refined_main_axis,
+                        order_list=sorders,
+                        fobj=fobj,
+                        t=refined_t,
+                    )
+                pg = "C%s"%mainax_bestorder
+            else:
+                pg = None
+        else:
+            pg = None
+    else:
+        pg = None
+    return pg
 
 def single_5fold(emmap1, axes, sordern, fscs, fobj):
     try:
