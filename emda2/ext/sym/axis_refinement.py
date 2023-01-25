@@ -781,6 +781,7 @@ def prepare_data_using_halfmaps(half1, imask, axis, symorder, resol=None, fobj=N
 
     m = re.search('emd_(.+)_half', half1)
     logname = 'emd-%s-pointgroup.txt'%m.group(1)
+    emdbid = 'emd-%s'%m.group(1)
     if fobj is None:
         fobj = open(logname, 'w')
     maskname = 'emda_mapmask_emd-'+m.group(1)+'.mrc'
@@ -811,6 +812,15 @@ def prepare_data_using_halfmaps(half1, imask, axis, symorder, resol=None, fobj=N
     writemap(rmask, newcell, reboxedmaskname)
     # create resolution grid
     nbin, res_arr, bin_idx, sgrid = em.get_binidx(cell=newcell, arr=rmap1)
+
+    claimed_res = float(resol)
+    dist = np.sqrt((res_arr - claimed_res) ** 2)
+    claimed_cbin = np.argmin(dist)
+    if res_arr[claimed_cbin] <= claimed_res:
+        claimed_cbin -= 1
+    claimed_res = res_arr[claimed_cbin]
+    print('Claimed resolution and cbin: ', claimed_res, claimed_cbin)
+
     binfsc = em.fsc(
         f1=fftshift(fftn(rmap1 * rmask)), 
         f2=fftshift(fftn(rmap2 * rmask)), 
@@ -818,7 +828,7 @@ def prepare_data_using_halfmaps(half1, imask, axis, symorder, resol=None, fobj=N
         nbin=nbin
         )
     fsc_full = 2 * binfsc / (1. + binfsc)
-    fo = fftshift(fftn(fftshift(fullmap)))
+    fo = fftshift(fftn(fftshift(fullmap * rmask)))
     nx, ny, nz = fo.shape
     eo = fcodes2.get_normalized_sf_singlemap(
         fo=fo,
@@ -827,17 +837,9 @@ def prepare_data_using_halfmaps(half1, imask, axis, symorder, resol=None, fobj=N
         mode=0,
         nx=nx,ny=ny,nz=nz,
         )
-    fsc_star = np.sqrt(filter_fsc(fsc_full, thresh=0.1))
+    fsc_full = filter_fsc(fsc_full, thresh=0.1)
+    fsc_star = np.sqrt(fsc_full)
     eo = eo * fcodes2.read_into_grid(bin_idx, fsc_star, nbin, nx, ny, nz)
-
-    #### Testing blurring ####
-    #eo = maptools.apply_bfactor_to_map(
-    #    fmap=eo, bf_arr=[-80], uc=newcell)[:,:,:,0]
-    #eo = fcodes2.simple_blur(eo, newcell, nx, ny, nz) #simple blurring
-    #fmap1 = np.real(ifftshift(ifftn(ifftshift(eo))))
-    #writemap(fmap1, newcell, 'fmap3.mrc')
-    #exit()
-    ####
     
     emmap1 = EmmapOverlay(arr=fullmap)
     emmap1.map_unit_cell = newcell
@@ -848,6 +850,11 @@ def prepare_data_using_halfmaps(half1, imask, axis, symorder, resol=None, fobj=N
     emmap1.fitfsc = 0.1
     emmap1.fo_lst = [fo]
     emmap1.eo_lst = [eo]
+    emmap1.output_maps = True
+    emmap1.emdbid = emdbid
+    emmap1.fscfull = fsc_full
+    emmap1.claimed_res = claimed_res
+    emmap1.claimed_bin = claimed_cbin
     results = axis_refine(
         emmap1=emmap1,
         rotaxis=axis,
@@ -860,7 +867,7 @@ def prepare_data_using_halfmaps(half1, imask, axis, symorder, resol=None, fobj=N
 if __name__ == "__main__":
     #imap = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-0608/emd_0608.map"
     #imap =  "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-0139/emda_reboxedmap_emd-0139.map.mrc"
-    imap = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-0689/emd_0689.map"
+    #imap = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-0689/emd_0689.map"
     #imap = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-20690/emd_20690.map"
     #imap = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-21971/emd_21971_reboxed.map"
     #imap = "/Users/ranganaw/MRC/REFMAC/symmetry/EMD-22199/emd_22199.map"
@@ -895,12 +902,18 @@ if __name__ == "__main__":
     #singleaxisrefine(imap, imask, symorder, axis)
 
 
-    half1="/Users/ranganaw/MRC/REFMAC/symmetry/testcases/EMD-12819/emd_12819_half_map_1.map"
-    imask="/Users/ranganaw/MRC/REFMAC/symmetry/testcases/EMD-12819/manual_emda_mask_0.mrc"
-    axis=[0.5237267504834436, -0.010016429961688136, 0.8518274249863498]
-    symorder=5
+    #half1="/Users/ranganaw/MRC/REFMAC/symmetry/testcases/EMD-12819/emd_12819_half_map_1.map"
+    #imask="/Users/ranganaw/MRC/REFMAC/symmetry/testcases/EMD-12819/manual_emda_mask_0.mrc"
+    #axis=[0.5237267504834436, -0.010016429961688136, 0.8518274249863498]
+    #symorder=5
+    half1 = "/Users/ranganaw/MRC/REFMAC/symmetry/testcases/EMD-21231/emd_21231_half_map_1.map"
+    imask = "/Users/ranganaw/MRC/REFMAC/symmetry/testcases/EMD-21231/emd_21231_msk_1.map"
+    axis = [0.002,  0.020,  1.000]
+    symorder = 3
+    resol = 4.6
     prepare_data_using_halfmaps(
         half1=half1, 
         imask=imask, 
         axis=axis, 
-        symorder=symorder)
+        symorder=symorder,
+        resol=resol)
