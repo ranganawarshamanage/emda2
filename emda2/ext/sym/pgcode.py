@@ -67,14 +67,16 @@ def calc_fsc(emmap1, axis, angle, t=None, fobj=None, fo=None):
     if t is None:
         t = np.array([0., 0., 0.], 'float')
     try:
+        print('t: ', t)
         nx, ny, nz = fo.shape
         t = -np.asarray(t, 'float')  # reverse the direction
         st = fcodes2.get_st(nx, ny, nz, t)[0]
         rotmat = get_rotmat_from_axisangle(axis, angle)
         # NOTE - first translate then rotate.
-        frt = rotate_f(rotmat, fo*st, interp="linear")[:, :, :, 0]
+        fst = fo*st
+        frt = rotate_f(rotmat, fst, interp="linear")[:, :, :, 0]
         fsc = fsctools.anytwomaps_fsc_covariance(
-            fo, frt, bin_idx, nbin)[0]
+            fst, frt, bin_idx, nbin)[0]
         ax_fsc = fsc[cbin] # sym. FSC @ claimed resol.
         return [fsc, ax_fsc, frt]
     except:
