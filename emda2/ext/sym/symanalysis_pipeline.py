@@ -259,7 +259,7 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     com = center_of_mass_density(map1)
     box_centr = (nx // 2, ny // 2, nz // 2)
     # applying translation in Fourier space is faster
-    t = [(box_centr[i] - com[i]) / sh for i, sh in enumerate(map1.shape)]
+    t = [-(box_centr[i] - com[i]) / sh for i, sh in enumerate(map1.shape)]
     st = fcodes2.get_st(nx, ny, nz, t)[0]
     fhf1 = st * fhf1
     fhf2 = st * fhf2
