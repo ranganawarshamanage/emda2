@@ -40,10 +40,12 @@ def average(fo, axis, fold, t, **kwargs):
     print('Size of arrays= %.2f GB'%size_GB)
     if size_GB > 2.0:
         # switch to single mode
-        f_sum = fo
+        f_sum = np.zeros(fo.shape, fo.dtype)
+        #f_sum = fo
         for angle in anglist:
             print('angle being used: ', angle)
             f_sum += transform(fo, axis, angle) 
+        f_sum += fo
     elif 'bin_idx' in kwargs and 'ibin' in kwargs:
         bin_idx = kwargs['bin_idx']
         ibin = kwargs['ibin']
@@ -58,10 +60,12 @@ def average(fo, axis, fold, t, **kwargs):
             nx,ny,nz
             )
     else:
-        f_sum = fo
+        f_sum = np.zeros(fo.shape, fo.dtype)
+        #f_sum = fo
         for angle in anglist:
             print('angle being used: ', angle)
             f_sum += transform(fo, axis, angle)        
+        f_sum += fo
     return f_sum/fold
 
 def average2(fo, axes, folds, tlist):
@@ -69,12 +73,13 @@ def average2(fo, axes, folds, tlist):
     nx, ny, nz = fo.shape
     i = 1
     print('symmetry averaging....')
+    f_sum = np.zeros(fo.shape, fo.dtype)
     for axis, t, fold in zip(axes, tlist, folds):
         print('axis, fold, t: ', axis, fold, t)
         t = -np.asarray(t, 'float') # reverse the translation. 
         st = fcodes2.get_st(nx, ny, nz, t)[0]
         fo = fo*st
-        if i == 1: f_sum = fo
+        if i == 1: f_sum += fo
         anglist = [float(360*i/fold) for i in range(1, fold)]
         for angle in anglist:
             print('angle being used: ', angle)
