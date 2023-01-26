@@ -3042,6 +3042,7 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
            s(1) = real(h) 
            s(2) = real(k) 
            s(3) = real(l)
+           !if(arr1(h,k,l) <= 1e-5) cycle
            x = matmul(RM,s)
            x0 = floor(x); x1 = x0 + 1
            x0 = min(nxyzmx, max(nxyzmn, x0))
