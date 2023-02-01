@@ -8,10 +8,12 @@ Mozilla Public License, version 2.0; see LICENSE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
 import argparse
-import sys, re
+import sys, re, os
 import datetime
 import emda2.config
-from emda2.core import iotools, maptools, restools, plotter, fsctools, quaternions
+from emda2.core import (
+    iotools, maptools, restools, plotter, fsctools, 
+    quaternions, emdalogger)
 from numpy.fft import fftshift, ifftshift, fftn, ifftn
 import emda2.emda_methods2 as em
 
@@ -168,6 +170,16 @@ def calc_fsc(args):
                             bin_idx=bin_idx,
                             nbin=nbin)
             fsclist.append(twomapfsc)
+        # print FSC in tabular format
+        fobj = open('emda_fsc.log', 'w')
+        for imap in args.maplist:
+            emdalogger.log_string(fobj=fobj, s=os.path.abspath(imap))
+        labels.insert(0, 'Resol.')
+        fsclist.insert(0, res_arr)
+        emdalogger.log_fsc(
+            fobj=fobj, 
+            dic=dict(zip(labels,fsclist ))
+        )
         # plot FSCs
         plotter.plot_nlines(res_arr=res_arr,
                             list_arr=fsclist,
