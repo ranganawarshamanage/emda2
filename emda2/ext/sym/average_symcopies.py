@@ -106,7 +106,7 @@ def main(f_list, axes, folds, tlist, **kwargs):
     binfsc2 = fsctools.anytwomaps_fsc_covariance(
             fhf1_avg, fhf2_avg, bin_idx, nbin)[0]
         
-    return binfsc1, binfsc2
+    return binfsc1, binfsc2, [fhf1_avg, fhf2_avg]
 
 
 
