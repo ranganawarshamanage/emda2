@@ -483,14 +483,15 @@ def fsc_between_static_and_transfomed_map(emmap1, rm, t, ergi=None, ibin=None):
     if ibin is None: ibin = nbin
     nx, ny, nz = eo.shape
     st, _, _, _ = fc.get_st(nx, ny, nz, t)
-    if ergi is not None:
-        ert = st * get_f(eo, ergi[0], ergi[1], rm)
-    else:
-        # test - 1st translate then rotate
-        map2 = (ifftshift((ifftn(ifftshift(st * eo))).real))
-        # rotate in real space
-        map2 = fc.trilinear_map(rm, map2, 0, nx, ny, nz)
-    ert = fftshift(fftn(fftshift(map2)))
+    # test - 1st translate then rotate
+    e1 = eo*st
+    """ map2 = (ifftshift((ifftn(ifftshift(e1))).real))
+    e1x = fftshift(fftn(fftshift(map2)))
+    # rotate in real space
+    map2 = fc.trilinear_map(rm, map2, 0, nx, ny, nz)
+    ert = fftshift(fftn(fftshift(map2))) """
+    ert = rotate_f(rm, e1, bin_idx, ibin)[:,:,:,0]
+
     f1f2_fsc = fsctools.anytwomaps_fsc_covariance(
         eo, ert, bin_idx, nbin)[0]
     return f1f2_fsc, ert
