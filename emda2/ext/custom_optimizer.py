@@ -257,7 +257,8 @@ class Optimiser:
                     maps2send = np.stack((self.e1, self.cfo), axis = -1)
                     bin_idx = self.mapobj.cbin_idx
                     nbin = self.mapobj.cbin
-                    maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                    #maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)  
+                    maps = fcodes2.trilinear_sphere(self.rotmat,maps2send,bin_idx,0,nbin,2,cx,cy,cz)      
                     self.ert = maps[:, :, :, 0]
                     self.crt = maps[:, :, :, 1]
                 elif translation and not rotation:
@@ -273,7 +274,8 @@ class Optimiser:
                     maps2send = np.stack((self.e1, self.cfo), axis = -1)
                     bin_idx = self.mapobj.cbin_idx
                     nbin = self.mapobj.cbin
-                    maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                    #maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz) 
+                    maps = fcodes2.trilinear_sphere(self.rotmat,maps2send,bin_idx,0,nbin,2,cx,cy,cz)       
                     # then translate
                     self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
                     self.sv = np.array([s1, s2, s3])
@@ -377,7 +379,7 @@ class linefit:
         if len(e_list) == 2:
             eout, self.bin_idx, self.nbin = cut_resolution_for_linefit(e_list, bin_idx, res_arr, smax)
         else:
-            print("len(e_list: ", len(e_list))
+            print("len(e_list): ", len(e_list))
             raise SystemExit()
         self.e0 = eout[0,:,:,:]
         self.e1 = eout[1,:,:,:]
