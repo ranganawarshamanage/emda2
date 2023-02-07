@@ -19,8 +19,9 @@ from emda.ext.mapfit import utils
 import emda.emda_methods as em
 from scipy.fft import ifftshift
 
-from emda2.core import iotools, maptools
+from emda2.core import iotools, maptools, fsctools
 from scipy.ndimage.interpolation import shift
+import fcodes2
 
 
 np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
@@ -261,150 +262,6 @@ def derivatives_translation(e0, e1, wgrid, w2grid, sv):
     #print("time for trans deriv. ", end-start)
     return step
 
-#class EmFit:
-#    def __init__(self, mapobj, interp="linear", dfs=None):
-#        self.mapobj = mapobj
-#        self.cut_dim = mapobj.cdim
-#        self.ful_dim = mapobj.map_dim
-#        self.cell = mapobj.map_unit_cell
-#        self.pixsize = mapobj.pixsize
-#        self.origin = mapobj.map_origin
-#        self.interp = interp
-#        self.dfs = dfs
-#        self.w_grid = None
-#        self.fsc = None
-#        self.sv = None
-#        self.t = None
-#        self.st = None
-#        self.step = None
-#        self.q = None
-#        self.q_accum = None
-#        self.q_final_list = []
-#        self.rotmat = None
-#        self.t_accum = None
-#        self.ert = None
-#        self.frt = None
-#        self.cfo = None
-#        self.crt = None
-#        self.e0 = None
-#        self.e1 = None
-#        self.w2_grid = None
-#        self.fsc_lst = []
-#        self.le0 = None
-#        self.le1 = None
-#        self.lbinindx = None
-#        self.lnbin = None
-#        self.finalrun = False # test option
-#        self.comshift = None
-#
-#    def calc_fsc(self):
-#        binfsc, _, bincounts = core.fsc.anytwomaps_fsc_covariance(
-#            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin)
-#        # return average fsc as well
-#        print('bin-FSC:')
-#        print(binfsc)
-#        fsc_avg = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
-#        return [binfsc, fsc_avg]
-#
-#    def get_wght(self): 
-#        cx, cy, cz = self.e0.shape
-#        val_arr = np.zeros((self.mapobj.cbin, 2), dtype='float')
-#        val_arr[:,0] = self.fsc #/ (1 - self.fsc ** 2)
-#        fsc_sqd = self.fsc ** 2
-#        fsc_combi = fsc_sqd #/ (1 - fsc_sqd)
-#        val_arr[:,1] = fsc_combi
-#        wgrid = fcodes_fast.read_into_grid2(self.mapobj.cbin_idx,val_arr, self.mapobj.cbin, cx, cy, cz)
-#        return wgrid[:,:,:,0], wgrid[:,:,:,1]
-#
-#    def functional(self):
-#        fval = np.sum(self.w_grid * self.e0 * np.conjugate(self.ert))
-#        return fval.real
-#
-#    def minimizer(self, ncycles, t, rotmat, ifit, smax_lf, fobj=None, q_init=None):
-#        tol = 1e-2
-#        fsc_lst = []
-#        fval_list = []
-#        self.e0 = self.mapobj.ceo_lst[0]  # Static map e-data for fit
-#        xyz = create_xyz_grid(self.cell, self.cut_dim)
-#        xyz_sum = get_xyz_sum(xyz)
-#        if q_init is None:
-#            q_init = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
-#            q_current = q_init
-#        print("Cycle#   ", "Fval  ", "Rot(deg)  ", "Trans(A)  ", "avg(FSC)")
-#        q0 = quaternions.rot2quart(rotmat)
-#        self.e1 = self.mapobj.ceo_lst[1]
-#        self.cfo = self.mapobj.cfo_lst[0]
-#        assert np.ndim(rotmat) == 2
-#        for i in range(ncycles):
-#            start = timer()
-#            cx, cy, cz = self.e0.shape
-#            if i == 0:
-#                self.t = np.array([0.0, 0.0, 0.0], dtype="float")
-#                self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
-#                self.sv = np.array([s1, s2, s3])
-#                self.q = q_init
-#                self.rotmat = core.quaternions.get_RM(self.q)
-#                self.ert = self.e1
-#                self.crt = self.cfo
-#            else:
-#                # first rotate
-#                self.rotmat = core.quaternions.get_RM(self.q)
-#                maps2send = np.stack((self.e1, self.cfo), axis = -1)
-#                bin_idx = self.mapobj.cbin_idx
-#                nbin = self.mapobj.cbin
-#                maps = fcodes_fast.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
-#                # then translate
-#                self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
-#                self.sv = np.array([s1, s2, s3])
-#                self.ert = maps[:, :, :, 0] * self.st
-#                self.crt = maps[:, :, :, 1] * self.st
-#            self.fsc, fsc_avg = self.calc_fsc()
-#            fsc_lst.append(self.fsc)
-#            self.w_grid, self.w2_grid = self.get_wght()
-#            fval = self.functional()
-#            fval_list.append(fval)
-#            # current rotation and translation to print
-#            q = quaternions.quaternion_multiply(self.q, q0)
-#            q = q / np.sqrt(np.dot(q, q))
-#            theta2 = np.arccos((np.trace(quaternions.get_RM(q)) - 1) / 2) * 180.0 / np.pi
-#            t_accum_angstrom = (t + self.t) * self.pixsize * self.mapobj.map_dim[0]
-#            if self.comshift is not None:
-#                t_accum_angstrom += self.comshift
-#            translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
-#            if i > 0 and abs(fval_list[-1] - fval_list[-2]) < tol:
-#                break
-#            if i % 2 == 0:
-#                self.step = derivatives_rotation(
-#                    self.e0, self.ert, self.crt, self.w_grid, self.sv, self.q, xyz, xyz_sum)
-#                lft = linefit()
-#                lft.get_linefit_static_data(
-#                    [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
-#                lft.step = self.step
-#                lft.q_prev = self.q
-#                alpha_r = lft.scalar_opt()
-#                print('q-step, alpha_r ', self.step, alpha_r)
-#                self.q += np.insert(self.step * alpha_r, 0, 0.0)
-#                self.q = self.q / np.sqrt(np.dot(self.q, self.q))
-#            else:
-#                # translation optimisation
-#                self.step = derivatives_translation(
-#                    self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
-#                lft = linefit()
-#                lft.get_linefit_static_data(
-#                    [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
-#                lft.step = self.step
-#                alpha_t = lft.scalar_opt_trans()
-#                print('t-step, alpha_t ', self.step, alpha_t)
-#                self.t += self.step * alpha_t
-#            print(
-#                "{:5d} {:8.4f} {:6.4f} {:6.4f} {:6.4f}".format(
-#                    i, fval, theta2, translation_vec, fsc_avg
-#                )
-#            )
-#            end = timer()
-#            if timeit:
-#                print("time for one cycle:", end - start)
-
 
 def run_bfgs(mapobj, optmethod=None):
     from emda2.ext.bfgs import create_xyz_grid
@@ -443,11 +300,19 @@ def run_bfgs(mapobj, optmethod=None):
 
 def fsc_between_static_and_transfomed_map(maps, bin_idx, rm, t, nbin):
     nx, ny, nz = maps[0].shape
-    maps2send = np.stack((maps[1], maps[2]), axis = -1)
-    frs = fcodes_fast.trilinear2(maps2send,bin_idx,rm,nbin,0,2,nx, ny, nz)
+    maps2send = np.stack([maps[1], maps[2]], axis = -1)
+    print('shape of maps2send:', maps2send.shape)
+    ncopies = 2
+    if not np.allclose(rm, np.eye(rm.shape[0])):
+        #frs = fcodes_fast.trilinear2(maps2send,bin_idx,rm,nbin,0,2,nx, ny, nz)
+        frs = fcodes2.trilinear_sphere(rm,maps2send,bin_idx,0,nbin,ncopies,nx,ny,nz)
+    else:
+        frs = maps2send
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-    f1f2_fsc, _, bin_count = core.fsc.anytwomaps_fsc_covariance(
+    f1f2_fsc, _, bin_count = fsctools.anytwomaps_fsc_covariance(
         maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)
+    #f1f2_fsc, _, bin_count = core.fsc.anytwomaps_fsc_covariance(
+    #    maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)
     fsc_avg = get_avg_fsc(binfsc=f1f2_fsc, bincounts=bin_count)
     return [f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st, fsc_avg]
 
@@ -614,34 +479,19 @@ def run_fit(
         if ibin == 0:
             print("ibin = 0, Cannot proceed! Stopping now...")
             return None
-        # smoothen e maps
-        #fsc_wght = fcodes_fast.read_into_grid(
-        #    emmap1.bin_idx, 
-        #    f1f2_fsc, 
-        #    emmap1.nbin, 
-        #    emmap1.map_dim[0], 
-        #    emmap1.map_dim[1], 
-        #    emmap1.map_dim[2])
-        #e0 = fsc_wght * emmap1.eo_lst[0]
-        #ert = fsc_wght * ert
-        #e_list = [e0, ert, frt]
-        # using a B-factor
-        #e0 = maptools.apply_bfactor_to_map(fmap=emmap1.eo_lst[0], bf_arr=[-90], uc=emmap1.map_unit_cell)[:,:,:,0]
-        #ert = maptools.apply_bfactor_to_map(fmap=ert, bf_arr=[-90], uc=emmap1.map_unit_cell)[:,:,:,0]
-        #e_list = [e0, ert, frt]
         # remove negative Fs from e0 and e1
         e_list = [emmap1.eo_lst[0], ert, frt]
-        """ eout, cBIdx, cbin = cut_resolution_for_linefit(
+        eout, cBIdx, cbin = cut_resolution_for_linefit(
             e_list, emmap1.bin_idx, emmap1.res_arr, ibin
         )
         emmap1.ceo_lst = [eout[0, :, :, :], eout[1, :, :, :]]
         emmap1.cfo_lst = [eout[2, :, :, :]]
         emmap1.cbin_idx = cBIdx
         emmap1.cdim = eout[1, :, :, :].shape
-        emmap1.cbin = cbin """
+        emmap1.cbin = cbin
         # testing pading in fourier space
         # here i cut data at low resol, but keep the grid same size
-        nx, ny, nz = ert.shape
+        """ nx, ny, nz = ert.shape
         eout = fcodes_fast.cutmap_arr(
             e_list, 
             emmap1.bin_idx, 
@@ -655,7 +505,7 @@ def run_fit(
         emmap1.cfo_lst = [eout[2, :, :, :]]
         emmap1.cbin_idx = emmap1.bin_idx
         emmap1.cdim = eout[1, :, :, :].shape
-        emmap1.cbin = len(emmap1.res_arr)
+        emmap1.cbin = len(emmap1.res_arr) """
         #
         if optmethod == 'custom':
             from emda2.ext.custom_optimizer import Optimiser
