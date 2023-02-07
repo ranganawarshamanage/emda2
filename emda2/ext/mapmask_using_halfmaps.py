@@ -112,8 +112,12 @@ def find_vf(arr, plotname='plot.png'):
     #plt.show()
     #binarymask = arr >= (1. - 0.005*ibin)
     print('xc=', xc)
-    binarymask = arr >= xc[1]#(0.005*ibin)
-    return binarymask, xc[1]
+    if len(xc) == 2:
+        thresh = (xc[0] + xc[1]) / 2
+    else:
+        thresh = xc[1]
+    binarymask = arr >= thresh
+    return binarymask, thresh
 
 
 def variance40_mask(arr, vfthresh=0.4):
