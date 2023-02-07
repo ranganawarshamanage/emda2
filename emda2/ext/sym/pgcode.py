@@ -72,11 +72,16 @@ def calc_fsc(emmap1, axis, angle, t=None, fobj=None, fo=None):
         t = -np.asarray(t, 'float')  # reverse the direction
         st = fcodes2.get_st(nx, ny, nz, t)[0]
         rotmat = get_rotmat_from_axisangle(axis, angle)
+        print('RM:')
+        print(rotmat)
         # NOTE - first translate then rotate.
         fst = fo*st
         frt = rotate_f(rotmat, fst, interp="linear")[:, :, :, 0]
         fsc = fsctools.anytwomaps_fsc_covariance(
             fst, frt, bin_idx, nbin)[0]
+        """ print('~~~~~~~ TEST ~~~~~~~')
+        for i, ifsc in enumerate(fsc):
+            print(i, emmap1.res_arr[i], ifsc) """
         ax_fsc = fsc[cbin] # sym. FSC @ claimed resol.
         return [fsc, ax_fsc, frt]
     except:
@@ -427,7 +432,7 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
             fsc_refined_ax1 = binfsc_refax[cbin] # refined FSC @ claimed resol.
 
             # determine the t_centroid for refined axis and current order
-            result = [abs(t_fnl[i]*emmap1.map_dim[i]*emmap1.pix[i]) < 0.05 for i in range(3)]
+            result = [abs(t_fnl[i]*emmap1.map_dim[i]*emmap1.pix[i]) < 0.01 for i in range(3)]
             if all(result):
                 t_centroid = t_fnl
             elif order == 2:
@@ -435,6 +440,12 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
             else:
                 t_centroid = get_t_to_centroid(emmap1=emmap1, axis=ax_fnl, order=order)
             # collect results in symdat
+            binfsc_refax, _, _ = calc_fsc(
+                emmap1=emmap1,
+                axis=ax_fnl,
+                angle=float(360/order),
+                t=t_centroid,
+                )            
             emmap1.symdat.append([[order],ax_fnl,list(binfsc_refax),t_centroid])
             pos_ax = [
                 (emmap1.com1[i] - t_centroid[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
@@ -635,6 +646,40 @@ def check_for_cyclic_only(emmap1, axes, orders, fscs, fobj):
     sfscs, sorders, saxes = sort_together([fscs, orders, axes], reverse=True)
     # only one axis?
     mask = [True]
+    if len(saxes) == 1:
+        # only one axis
+        pg = 'C1'
+        refinement_results = refine_ax(
+            emmap1=emmap1,
+            axlist=[saxes[0]],
+            orderlist=[sorders[0]],
+            fobj=fobj,
+        ) 
+        if refinement_results is not None:
+            (ref_axlist,
+             ref_tlist,
+             _,_,
+             ref_fsclist) = refinement_results
+            refined_main_axis = ref_axlist[0]
+            fsc_refined_axis = ref_fsclist[0]
+            t_centroid = ref_tlist[0]
+            if fsc_refined_axis > pg_decide_fsc:
+                emdalogger.log_string(
+                    fobj,
+                    '%s-fold is real. Checking for C...' %sorders[0] 
+                )
+                refined_t = ref_tlist[0]
+                # get the best order of main axis
+                mainax_bestorder, mainax_bestorder_fsc = get_axorder(
+                        emmap1=emmap1,
+                        refined_axis=refined_main_axis,
+                        order_list=sorders,
+                        fobj=fobj,
+                        t=refined_t,
+                    )
+                pg = "C%s"%mainax_bestorder
+        return pg
+    # more than one axis
     for axis in saxes[1:]:
         angle = cosine_angle(saxes[0], axis)
         if angle <= ang_tol_p or (180. - angle) <= ang_tol_p:
