@@ -199,6 +199,7 @@ class Opt_trans:
 
 def refine_translation(emmap1, axis, order):
     from emda2.core import maptools
+    from emda2.ext.sym.axis_refinement import rotate_f
     # rotate the map by different angles and optimize the translation
     # then average to get the translation
 
@@ -217,15 +218,22 @@ def refine_translation(emmap1, axis, order):
         print('angle: ', angle)
         q = quaternions.get_quaternion(list(axis), angle)
         #rotmat = quaternions.get_RM(q)
-        f_transformed = maptools.transform_f(
-                        flist=[fo, eo],
-                        axis=axis,
-                        translation=t,
-                        angle=angle
-                        )
+        #f_transformed = maptools.transform_f(
+        #                flist=[fo, eo],
+        #                axis=axis,
+        #                translation=t,
+        #                angle=angle
+        #                )
+        f_transformed = rotate_f(
+            rm=quaternions.get_RM(q), 
+            f=np.stack([fo, eo], axis=-1), 
+            bin_idx=emmap1.bin_idx, 
+            ibin=emmap1.nbin)
+        emmap1.fo_lst = [fo, f_transformed[:,:,:,0]]
+        emmap1.eo_lst = [eo, f_transformed[:,:,:,1]]
         # this is using emda overlay optimisation for translation
-        emmap1.fo_lst = [fo, f_transformed[0]]
-        emmap1.eo_lst = [eo, f_transformed[1]]
+        #emmap1.fo_lst = [fo, f_transformed[0]]
+        #emmap1.eo_lst = [eo, f_transformed[1]]
         emmap1.map_origin = [0,0,0]
         emmap1.comlist = []
         emmap1.pixsize = emmap1.pix
