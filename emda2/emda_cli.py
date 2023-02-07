@@ -95,6 +95,7 @@ maptransform.add_argument("--ibin", required=False,
 maptransform.add_argument("--mapout", required=False, 
                     default="transformed.mrc", help="output map (mrc/map)")
 
+# apply rotation on map by interpolating in real space
 rotatemap = subparsers.add_parser(
     'rotatemap',
     description="apply a rotation on a map"
@@ -107,6 +108,21 @@ rotatemap.add_argument("--rotation", required=True,
                     type=float, help="rotation in degree")
 rotatemap.add_argument("--mapout", required=False, 
                     default="rotatedmap_rs.mrc", help="output map (mrc/map)")
+
+# rebox a map based on a mask
+reboxmap = subparsers.add_parser(
+    'reboxmap',
+    description="apply a rotation on a map"
+)
+reboxmap.add_argument("--map", required=True, 
+                    type=str, help="input map (.map/.mrc)")
+reboxmap.add_argument("--mask", required=True, 
+                    type=str, help="input mask (.map/.mrc)")
+reboxmap.add_argument("--padwidth", required=False, 
+                    type=int, default=10, help="rotation in degree")
+reboxmap.add_argument("--mapout", required=False, 
+                    default="emda_rbxmap.mrc", help="output map (mrc/map)")
+
 
 
 def find_pg(args):
@@ -182,9 +198,9 @@ def calc_fsc(args):
         )
         # plot FSCs
         plotter.plot_nlines(res_arr=res_arr,
-                            list_arr=fsclist,
+                            list_arr=fsclist[1:],
                             mapname="emda_fscs",
-                            curve_label=labels,
+                            curve_label=labels[1:],
                             fscline=0.,
                             plot_title="FSC against referencemap")
     except Exception as ex:
@@ -226,7 +242,32 @@ def rotate_map(args):
     m2.arr = rho
     m2.cell = m1.workcell
     m2.origin = m1.origin
-    m2.write()    
+    m2.write()   
+
+def rebox_map(args):
+    m1 = iotools.Map(args.map)
+    m1.read()
+    mm = iotools.Map(args.mask)
+    mm.read()    
+    reboxed_map, reboxed_mask = em.rebox_by_mask(
+        arr=m1.workarr, 
+        mask=mm.workarr, 
+        mask_origin=mm.origin, 
+        padwidth=args.padwidth) 
+    # output reboxed maps
+    pix = m1.workcell[0] / m1.workarr.shape[0]
+    newcell = [sh*pix for i, sh in enumerate(reboxed_map.shape)]
+    for _ in range(3): newcell.append(90.)
+    mrbx = iotools.Map(args.mapout)
+    mrbx.arr = reboxed_map
+    mrbx.cell = newcell
+    mrbx.origin = [0, 0, 0]
+    mrbx.write()
+    mmrbx = iotools.Map('emda_rbxmask.mrc')
+    mmrbx.arr = reboxed_mask
+    mmrbx.cell = newcell
+    mmrbx.origin = [0, 0, 0]
+    mmrbx.write()
 
 
 def main(command_line=None):
@@ -246,6 +287,8 @@ def main(command_line=None):
             apply_transformation(args)
         if args.command == 'rotatemap':
             rotate_map(args)
+        if args.command == 'reboxmap':
+            rebox_map(args)
 
             
 
@@ -266,6 +309,7 @@ def emda_commands():
     print('   mapmask      - generates a mask using halfmaps')
     print('   transform    - apply a transformation on the map (Fourier space)')
     print('   rotatemap    - apply a rotation on the map (Real space)')
+    print('   rebox        - rebox a map based on a mask')
     #print('   info      - output basic information about the map')
     
     #print('   halffsc   - computes FSC between half maps')
