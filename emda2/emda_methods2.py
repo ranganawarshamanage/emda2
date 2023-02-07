@@ -106,50 +106,6 @@ def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin, filename=None):
     )
     return bin_fsc
 
-#def mask_from_halfmaps(uc, half1, half2, radius=4, iter=1, dthresh=None):
-#    """Generates a mask from half maps.
-#
-#    Generates a mask from half maps based on real space local correlation.
-#
-#    Arguments:
-#        Inputs:
-#            uc: float, 1D array
-#                Unit cell parameters.
-#            half1: float, 3D array
-#                Half map 1 data.
-#            half2: float, 3D array
-#                Half map 2 data.
-#            radius: integer, optional
-#                Radius of integrating kernel in voxels. Default is 4.
-#            iter: integer,optional
-#                Number of dilation cycles. Default is 1 cycle.
-#            dthresh: float, optional
-#                The halfmap densities will be thresholded at this value prior
-#                calculating local correlation. If the value is not given,
-#                EMDA takes this values as the value at which the cumulative
-#                density probability is 0.99. This is the default. However,
-#                it is recommomded that this value should be supplied
-#                by the user and proven to be useful for cases those have
-#                micellular densities around protein.
-#                
-#
-#        Outputs:
-#            mask: float, 3D array
-#                3D Numpy array of correlation mask.
-#    """
-#    from emda2.ext import maskmap_class
-#    #from ext import maskmap_class
-#
-#    arr1, arr2 = half1, half2
-#    obj_maskmap = maskmap_class.MaskedMaps()
-#    obj_maskmap.smax = radius
-#    obj_maskmap.arr1 = arr1
-#    obj_maskmap.arr2 = arr2
-#    obj_maskmap.uc = uc
-#    obj_maskmap.iter = iter
-#    obj_maskmap.dthresh = dthresh
-#    obj_maskmap.generate_mask()
-#    return obj_maskmap.mask
 
 def mask_from_map(
     uc,
@@ -216,12 +172,6 @@ def mask_from_map_connectedpixels(m1, binthresh=None):
     from emda2.ext.mapmask import mapmask_connectedpixels
     masklist, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
     return masklist
-
-""" Old routine"""
-""" def mask_from_halfmaps(h1, h2):
-    from emda2.ext.mapmask_using_halfmaps import main
-    masklist = main(h1=h1, h2=h2)
-    return masklist """
 
 def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=None, res_arr=None):
     """Lowpass filters a map to a specified resolution.
@@ -726,33 +676,6 @@ def rebox_by_mask(arr, mask, mask_origin, padwidth=10):
         padwidth=padwidth)
     return reboxed_map, reboxed_mask
 
-#def get_pointgroup(axlist, orderlist, m1, resol=5.0, fsclim=0.7, fobj=None):
-#    """
-#    Find point group in EMDA using proshade axes and sym.order lists
-#
-#    Inputs:
-#        axlist: list of rotation axes output by Proshade
-#        orderlist: list of symmetry orders correspond with axes in axlist
-#        m1: mapobject from EMDA/iotools.Map
-#        resol: max. resolution for axis refinement and pointgroup detection
-#        fobj: file object for information output 
-#
-#    Outputs:
-#        pg: point group symbol
-#    """
-#    from emda2.ext.sym import pointgroup
-#    results = pointgroup.get_pg(
-#        axis_list=axlist, 
-#        orderlist=orderlist, 
-#        m1=m1, 
-#        resol=resol, 
-#        fobj=fobj, 
-#        fsc_cutoff=fsclim)
-#    if len(results) > 0:
-#        pg, gen_odrlist, gen_axlist = results
-#    else:
-#        pg = None
-#    return pg
 
 def flip_arr(arr, axis='z'):
     # axis to flip
@@ -854,6 +777,22 @@ def mask_from_halfmaps(h1, h2, emdbid='rhovar'):
     import emda2.ext.mapmask_using_halfmaps as hfmask
     mask = hfmask.main(h1=h1, h2=h2, emdbid=emdbid)
     return [mask]
+
+""" def symmetry_average_map(mlist, axlist, folds, rot_centre=None):
+    from emda2.ext.sym.average_symcopies import average
+    if rot_centre is None:
+        t = [0., 0., 0.]
+    else:
+
+    m1 = mlist[0]
+    nbin, res_arr, bin_idx, sgrid = get_binidx(cell=m1.workcell, arr=m1.workarr)
+    f_avg_list = []
+    for i, mp in enumerate(mlist):
+        fo = fftshift(fftn(fftshift(mp.workarr)))
+        f_avg = average(fo=fo, 
+            axis=axlist[i], fold=folds[i], t=tlist[i],bin_idx=bin_idx, ibin=nbin)
+        f_avg_list.append(f_avg)
+    return f_avg_list """
 
 
 if __name__=="__main__":
