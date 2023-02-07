@@ -232,9 +232,10 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     fhf2 = fftshift(fftn(fftshift(half2 * mask)))
 
     # select data upto claimed resol
-    print('Lowpass flitering data to claimed resolution %.3f' %claimed_res)
+    lowpass_res = claimed_res * 0.9
+    print('Lowpass flitering data to %.3f' %lowpass_res)
     fhf1, fhf2 = _lowpassmap_butterworth(
-        fclist=[fhf1, fhf2], sgrid=sgrid, smax=claimed_res)
+        fclist=[fhf1, fhf2], sgrid=sgrid, smax=lowpass_res)
     fo = (fhf1 + fhf2) / 2
     map1 = np.real(ifftshift(ifftn(ifftshift(fo)))) * mask
     # calculate halfmap FSC
@@ -364,17 +365,29 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     fsclist = []
     for i, row in enumerate(emmap1.symdat):
         fold, axis, binfsc, t = row[0], row[1], row[2], row[3]
-        if binfsc[emmap1.claimed_bin] >= pg_decide_fsc:
-            axes.append(axis)
-            folds.append(fold[0])
-            fsc_hf, fsc_symhf = avgsym.main(
-                f_list=[fhf1, fhf2], 
-                axes=[axis], 
-                folds=fold, 
-                tlist=[t], 
-                bin_idx=emmap1.bin_idx,
-                nbin=emmap1.nbin)
-            fsclist.append(fsc_symhf)
+        #if binfsc[emmap1.claimed_bin] >= pg_decide_fsc:
+        axes.append(axis)
+        folds.append(fold[0])
+        fsc_hf, fsc_symhf, favghf = avgsym.main(
+            f_list=[fhf1, fhf2], 
+            axes=[axis], 
+            folds=fold, 
+            tlist=[t], 
+            bin_idx=emmap1.bin_idx,
+            nbin=emmap1.nbin)
+        mapname1 = '%s_avghf1_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
+        mapname2 = '%s_avghf2_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
+        h1out = iotools.Map(mapname1)
+        h1out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[0]))))
+        h1out.cell = emmap1.map_unit_cell
+        h1out.origin = m1.origin
+        h1out.write()
+        h2out = iotools.Map(mapname2)
+        h2out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[1]))))
+        h2out.cell = emmap1.map_unit_cell
+        h2out.origin = m1.origin
+        h2out.write()
+        fsclist.append(fsc_symhf)
     # printing fscs
     if len(axes) > 0:
         b = np.zeros((len(axes), len(emmap1.res_arr)), 'float')
@@ -478,6 +491,11 @@ def main(half1, resol4axref=5., output_maps=True, resol=None, fobj=None, imask=N
     print('Reboxing...')
     rmap1, rmask = em.rebox_by_mask(arr=h1.workarr, mask=mm.workarr, mask_origin=mm.origin)
     rmap2, rmask = em.rebox_by_mask(arr=h2.workarr, mask=mm.workarr, mask_origin=mm.origin)
+    # one time test for EMD-12608
+    #rmap1 = h1.workarr
+    #rmap2 = h2.workarr
+    #rmask = mm.workarr
+    #
     fullmap = (rmap1 + rmap2) / 2
     # write out reboxed fullmap and mask
     newcell = [fullmap.shape[i]*h1.workcell[i]/shp for i, shp in enumerate(h1.workarr.shape)]
