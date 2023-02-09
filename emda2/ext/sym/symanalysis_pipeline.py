@@ -14,7 +14,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 import numpy as np
 import re, math, os
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
-from emda2.core import iotools
+from emda2.core import iotools, plotter
 import emda2.emda_methods2 as em
 from emda2.ext.mapmask import mask_from_halfmaps
 from emda2.ext.sym import proshade_tools
@@ -375,19 +375,20 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
             tlist=[t], 
             bin_idx=emmap1.bin_idx,
             nbin=emmap1.nbin)
-        mapname1 = '%s_avghf1_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
-        mapname2 = '%s_avghf2_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
-        h1out = iotools.Map(mapname1)
-        h1out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[0]))))
-        h1out.cell = emmap1.map_unit_cell
-        h1out.origin = m1.origin
-        h1out.write()
-        h2out = iotools.Map(mapname2)
-        h2out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[1]))))
-        h2out.cell = emmap1.map_unit_cell
-        h2out.origin = m1.origin
-        h2out.write()
-        fsclist.append(fsc_symhf)
+        if emmap1.output_maps:
+            mapname1 = '%s_avghf1_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
+            mapname2 = '%s_avghf2_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
+            h1out = iotools.Map(mapname1)
+            h1out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[0]))))
+            h1out.cell = emmap1.map_unit_cell
+            h1out.origin = m1.origin
+            h1out.write()
+            h2out = iotools.Map(mapname2)
+            h2out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[1]))))
+            h2out.cell = emmap1.map_unit_cell
+            h2out.origin = m1.origin
+            h2out.write()
+            fsclist.append(fsc_symhf)
     # printing fscs
     if len(axes) > 0:
         b = np.zeros((len(axes), len(emmap1.res_arr)), 'float')
@@ -409,6 +410,19 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
                 print(dash)
                 fobj.write(dash+'\n')
         fobj.write(dash+'\n')
+        print('Plotting FSCs...')
+        # plotting FSCs
+        labels = ['hf1-hf2']
+        for i in range(len(axes)):
+            labels.append('Ax%s Or%s:avghf1-avghf2'%(str(i+1),str(folds[i])))
+        fsclist.insert(0, fsc_hf)
+        plotter.plot_nlines(
+            res_arr=emmap1.res_arr,
+            list_arr=fsclist,
+            mapname="emd-%s_emda_halfmap-fscs"%emmap1.emdbid,
+            curve_label=labels,
+            fscline=0.,
+            plot_title="FSC between half maps")
     else:
         print('---- None of the axis has FSC_sym >= %s @ %.2f A'%(pg_decide_fsc, emmap1.claimed_res))
         fobj.write(
