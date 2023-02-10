@@ -214,6 +214,7 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     claimed_res = kwargs['claimed_res']
     resol4refinement = kwargs['resol4refinement']
     output_maps = kwargs['output_maps']
+    symaverage = kwargs['symaverage']
 
     pg_decide_fsc = 0.9
 
@@ -354,80 +355,81 @@ def get_pg(axlist, orderlist, fsclist, m1, **kwargs):
     fobj.write(dash+'\n')
 
     # average symcopies
-    print()
-    print('********** Average symmetry copies ************')
-    print('comparison of halfmap-FSC (FSCh) with '
-          'symmetry averaged halfmap-FSC per axis (FSCs)')
-    fobj.write('********** Average symmetry copies ************\n')
-    fobj.write('comparison of halfmap-FSC (FSCh) with '
-          'symmetry averaged halfmap-FSC per axis (FSCs)\n')
-    axes, folds, tlist = [], [], []
-    fsclist = []
-    for i, row in enumerate(emmap1.symdat):
-        fold, axis, binfsc, t = row[0], row[1], row[2], row[3]
-        #if binfsc[emmap1.claimed_bin] >= pg_decide_fsc:
-        axes.append(axis)
-        folds.append(fold[0])
-        fsc_hf, fsc_symhf, favghf = avgsym.main(
-            f_list=[fhf1, fhf2], 
-            axes=[axis], 
-            folds=fold, 
-            tlist=[t], 
-            bin_idx=emmap1.bin_idx,
-            nbin=emmap1.nbin)
-        if emmap1.output_maps:
-            mapname1 = '%s_avghf1_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
-            mapname2 = '%s_avghf2_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
-            h1out = iotools.Map(mapname1)
-            h1out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[0]))))
-            h1out.cell = emmap1.map_unit_cell
-            h1out.origin = m1.origin
-            h1out.write()
-            h2out = iotools.Map(mapname2)
-            h2out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[1]))))
-            h2out.cell = emmap1.map_unit_cell
-            h2out.origin = m1.origin
-            h2out.write()
-            fsclist.append(fsc_symhf)
-    # printing fscs
-    if len(axes) > 0:
-        b = np.zeros((len(axes), len(emmap1.res_arr)), 'float')
-        for i in range(len(axes)):
-            b[i,:] = fsclist[i]
-            l = 'ax'+str(i+1) + ': ' + vec2string(axes[i]) + ' Order: ' + str(folds[i])
-            print(l)
-        print(dash)
-        fobj.write(dash+'\n')
-        line1 = "  res  | " + " "*((m-4)//2) + "FSCs" + " "*((m-4)//2) + " |  FSCh "
-        print(line1)
-        fobj.write(line1+'\n')
-        print(dash)
-        fobj.write(dash+'\n')
-        for i, res in enumerate(emmap1.res_arr):
-            print("{:>6.2f} | {} | {:>6.3f}".format(res, vec2string(b[:,i]), fsc_hf[i]))
-            fobj.write("{:>6.2f} | {} | {:>6.3f}\n".format(res, vec2string(b[:,i]), fsc_hf[i]))
-            if i == emmap1.claimed_bin: 
-                print(dash)
-                fobj.write(dash+'\n')
-        fobj.write(dash+'\n')
-        print('Plotting FSCs...')
-        # plotting FSCs
-        labels = ['hf1-hf2']
-        for i in range(len(axes)):
-            labels.append('Ax%s Or%s:avghf1-avghf2'%(str(i+1),str(folds[i])))
-        fsclist.insert(0, fsc_hf)
-        plotter.plot_nlines(
-            res_arr=emmap1.res_arr,
-            list_arr=fsclist,
-            mapname="emd-%s_emda_halfmap-fscs"%emmap1.emdbid,
-            curve_label=labels,
-            fscline=0.,
-            plot_title="FSC between half maps")
-    else:
-        print('---- None of the axis has FSC_sym >= %s @ %.2f A'%(pg_decide_fsc, emmap1.claimed_res))
-        fobj.write(
-            '---- None of the axis has FSC_sym >= %s @ %.2f A\n'%(pg_decide_fsc, emmap1.claimed_res))
-        fobj.write(dash+'\n')
+    if symaverage:
+        print()
+        print('********** Average symmetry copies ************')
+        print('comparison of halfmap-FSC (FSCh) with '
+            'symmetry averaged halfmap-FSC per axis (FSCs)')
+        fobj.write('********** Average symmetry copies ************\n')
+        fobj.write('comparison of halfmap-FSC (FSCh) with '
+            'symmetry averaged halfmap-FSC per axis (FSCs)\n')
+        axes, folds, tlist = [], [], []
+        fsclist = []
+        for i, row in enumerate(emmap1.symdat):
+            fold, axis, binfsc, t = row[0], row[1], row[2], row[3]
+            #if binfsc[emmap1.claimed_bin] >= pg_decide_fsc:
+            axes.append(axis)
+            folds.append(fold[0])
+            fsc_hf, fsc_symhf, favghf = avgsym.main(
+                f_list=[fhf1, fhf2], 
+                axes=[axis], 
+                folds=fold, 
+                tlist=[t], 
+                bin_idx=emmap1.bin_idx,
+                nbin=emmap1.nbin)
+            if emmap1.output_maps:
+                mapname1 = '%s_avghf1_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
+                mapname2 = '%s_avghf2_ax%s_fold%s.mrc'%(emmap1.emdbid,i,fold[0])
+                h1out = iotools.Map(mapname1)
+                h1out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[0]))))
+                h1out.cell = emmap1.map_unit_cell
+                h1out.origin = m1.origin
+                h1out.write()
+                h2out = iotools.Map(mapname2)
+                h2out.arr = np.real(ifftshift(ifftn(ifftshift(favghf[1]))))
+                h2out.cell = emmap1.map_unit_cell
+                h2out.origin = m1.origin
+                h2out.write()
+                fsclist.append(fsc_symhf)
+        # printing fscs
+        if len(axes) > 0:
+            b = np.zeros((len(axes), len(emmap1.res_arr)), 'float')
+            for i in range(len(axes)):
+                b[i,:] = fsclist[i]
+                l = 'ax'+str(i+1) + ': ' + vec2string(axes[i]) + ' Order: ' + str(folds[i])
+                print(l)
+            print(dash)
+            fobj.write(dash+'\n')
+            line1 = "  res  | " + " "*((m-4)//2) + "FSCs" + " "*((m-4)//2) + " |  FSCh "
+            print(line1)
+            fobj.write(line1+'\n')
+            print(dash)
+            fobj.write(dash+'\n')
+            for i, res in enumerate(emmap1.res_arr):
+                print("{:>6.2f} | {} | {:>6.3f}".format(res, vec2string(b[:,i]), fsc_hf[i]))
+                fobj.write("{:>6.2f} | {} | {:>6.3f}\n".format(res, vec2string(b[:,i]), fsc_hf[i]))
+                if i == emmap1.claimed_bin: 
+                    print(dash)
+                    fobj.write(dash+'\n')
+            fobj.write(dash+'\n')
+            print('Plotting FSCs...')
+            # plotting FSCs
+            labels = ['hf1-hf2']
+            for i in range(len(axes)):
+                labels.append('Ax%s Or%s:avghf1-avghf2'%(str(i+1),str(folds[i])))
+            fsclist.insert(0, fsc_hf)
+            plotter.plot_nlines(
+                res_arr=emmap1.res_arr,
+                list_arr=fsclist,
+                mapname="emd-%s_emda_halfmap-fscs"%emmap1.emdbid,
+                curve_label=labels,
+                fscline=0.,
+                plot_title="FSC between half maps")
+        else:
+            print('---- None of the axis has FSC_sym >= %s @ %.2f A'%(pg_decide_fsc, emmap1.claimed_res))
+            fobj.write(
+                '---- None of the axis has FSC_sym >= %s @ %.2f A\n'%(pg_decide_fsc, emmap1.claimed_res))
+            fobj.write(dash+'\n')
 
     # FSC levels and point groups
     axes, folds = [], []
@@ -470,7 +472,7 @@ def get_pg_perlevel(a, axes, folds, level):
     return pglist
 
 
-def main(half1, resol4axref=5., output_maps=True, resol=None, fobj=None, imask=None):
+def main(half1, resol4axref=5., output_maps=True, symaverage=True, resol=None, fobj=None, imask=None):
     if resol is not None:
         resol = resol * 1.1 # taking 10% less resolution of author claimed
     # open halfmaps
@@ -545,6 +547,7 @@ def main(half1, resol4axref=5., output_maps=True, resol=None, fobj=None, imask=N
             half2=rmap2,
             resol4refinement=float(resol4axref),
             output_maps = output_maps,
+            symaverage = symaverage,
             )
         print('Proshade PG: ', proshade_pg)
         print('EMDA PG: ', emda_pg)
