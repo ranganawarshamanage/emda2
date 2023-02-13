@@ -49,6 +49,10 @@ pointg.add_argument("--resolution", required=True,
                     type=float, help="resolution of half1 (A)")
 pointg.add_argument("--resol4axref", required=False, default=5.,
                     type=float, help="resolution for axis refinement (5 Angs.)")
+pointg.add_argument("--outputmaps", action="store_true",
+                    help="if used, symmetry copies will be written out")
+pointg.add_argument("--symaverage", action="store_true",
+                    help="if used, symmetry averaging is carried out")
 
 # FSC between maps
 calcfsc = subparsers.add_parser(
@@ -132,6 +136,8 @@ def find_pg(args):
         mask=args.mask,
         resol=args.resolution,
         resol4axref=args.resol4axref,
+        symaverage=args.symaverage,
+        output_maps=args.outputmaps,
     )
 
 def make_mapmask(args):
