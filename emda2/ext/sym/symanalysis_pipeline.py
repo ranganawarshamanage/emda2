@@ -472,7 +472,7 @@ def get_pg_perlevel(a, axes, folds, level):
     return pglist
 
 
-def main(half1, resol4axref=5., output_maps=True, symaverage=True, resol=None, fobj=None, imask=None):
+def main(half1, resol4axref=5., output_maps=False, symaverage=False, resol=None, fobj=None, imask=None):
     if resol is not None:
         resol = resol * 1.1 # taking 10% less resolution of author claimed
     # open halfmaps
