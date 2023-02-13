@@ -687,11 +687,13 @@ def flip_arr(arr, axis='z'):
     except Exception as e:
         raise e
 
-def get_pointgroup(half1, mask, resol4axref=float(5), output_maps=True, resol=None):
+def get_pointgroup(
+    half1, mask, resol4axref=float(5), output_maps=False, symaverage=False, resol=None):
     from emda2.ext.sym.symanalysis_pipeline import main
     results = main(
         half1=half1, imask=mask, resol=resol,
-        resol4axref=resol4axref, output_maps=output_maps)
+        resol4axref=resol4axref, output_maps=output_maps,
+        symaverage=symaverage)
     return results
     
 def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
