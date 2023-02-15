@@ -429,8 +429,6 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
             ax_fnl, t_fnl, ax_position, binfsc_refax = results
             ref_axlist.append(ax_fnl)
 
-            fsc_refined_ax1 = binfsc_refax[cbin] # refined FSC @ claimed resol.
-
             # determine the t_centroid for refined axis and current order
             result = [abs(t_fnl[i]*emmap1.map_dim[i]*emmap1.pix[i]) < 0.01 for i in range(3)]
             if all(result):
@@ -445,7 +443,8 @@ def refine_ax(emmap1, axlist, orderlist, fobj):
                 axis=ax_fnl,
                 angle=float(360/order),
                 t=t_centroid,
-                )            
+                )          
+            fsc_refined_ax1 = binfsc_refax[cbin] # refined FSC @ claimed resol.  
             emmap1.symdat.append([[order],ax_fnl,list(binfsc_refax),t_centroid])
             pos_ax = [
                 (emmap1.com1[i] - t_centroid[i]*emmap1.map_dim[i])*emmap1.pix[i] for i in range(3)]
