@@ -1,11 +1,10 @@
 import numpy as np
 import emda.core as core
-from emda.ext import utils
-import fcodes_fast
-from emda.ext.mapfit import utils as maputils
+import fcodes2
 import emda2.core as core2
 from emda2.core import iotools
 import warnings
+from emda2.ext.overlay import get_avg_fsc
 
 def get_rgi(f):
     myrgi_real = core2.maptools.interp_rgi(data=np.real(f))
@@ -105,14 +104,14 @@ class Bfgs:
         #ert = maputils.get_FRS(rotmat, self.e1, interp="linear")[:, :, :, 0]
         ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)
 
-        st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, x[:3])
+        st, _, _, _ = fcodes2.get_st(nx, ny, nz, x[:3])
         ert = ert * st
 
         binfsc, _, _ = core.fsc.anytwomaps_fsc_covariance(
             self.e0, ert, self.bin_idx, self.nbin)
         val_arr = np.zeros((self.nbin, 2), dtype='float')
         val_arr[:,0] = binfsc #/ (1.0 - binfsc**2)
-        wgrid = fcodes_fast.read_into_grid2(self.bin_idx,
+        wgrid = fcodes2.read_into_grid2(self.bin_idx,
             val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
 
         dRdq = derivatives_wrt_q(q)
@@ -199,13 +198,13 @@ class Bfgs:
         mask = np.isnan(binfsc)
         binfsc = np.where(~mask,binfsc,0.)
         self.binfsc = binfsc
-        self.avgfsc = utils.get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
+        self.avgfsc = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
 
     def get_wght(self): 
         nz, ny, nx = self.e0.shape
         val_arr = np.zeros((self.nbin, 2), dtype='float')
         val_arr[:,0] = self.binfsc #/ (1 - self.binfsc ** 2)
-        self.wgrid = fcodes_fast.read_into_grid2(self.bin_idx,
+        self.wgrid = fcodes2.read_into_grid2(self.bin_idx,
             val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
 
     #3. functional
@@ -219,7 +218,7 @@ class Bfgs:
         #ert = maputils.get_FRS(rotmat, self.e1, interp="linear")[:, :, :, 0] # faster, less accurate
         ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat) # slower
         self.t = x[:3]
-        self.ert = ert * fcodes_fast.get_st(nx, ny, nz, self.t)[0]
+        self.ert = ert * fcodes2.get_st(nx, ny, nz, self.t)[0]
         self.calc_fsc()
         #print(self.binfsc)
         self.get_wght()
@@ -285,7 +284,7 @@ class Bfgs:
         rotmat = core.quaternions.get_RM(self.q)
         ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)
         nx, ny, nz = ert.shape
-        self.ert = ert * fcodes_fast.get_st(nx, ny, nz, self.t)[0]
+        self.ert = ert * fcodes2.get_st(nx, ny, nz, self.t)[0]
 
 
 
@@ -317,14 +316,14 @@ class Bfgs_trans:
         nx, ny, nz = self.e0.shape
         vol = nx * ny * nz
 
-        st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, x)
+        st, _, _, _ = fcodes2.get_st(nx, ny, nz, x)
         ert = self.e1 * st
 
         binfsc, _, _ = core.fsc.anytwomaps_fsc_covariance(
             self.e0, ert, self.bin_idx, self.nbin)
         val_arr = np.zeros((self.nbin, 2), dtype='float')
         val_arr[:,0] = binfsc #/ (1.0 - binfsc**2)
-        wgrid = fcodes_fast.read_into_grid2(self.bin_idx,
+        wgrid = fcodes2.read_into_grid2(self.bin_idx,
             val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
 
         ddf = np.zeros((3, 3), dtype="float")
@@ -342,14 +341,14 @@ class Bfgs_trans:
         vol = nx * ny * nz
         tpi = (2.0 * np.pi * 1j)
 
-        st, sv1, sv2, sv3 = fcodes_fast.get_st(nx, ny, nz, x)
+        st, sv1, sv2, sv3 = fcodes2.get_st(nx, ny, nz, x)
         ert = self.e1 * st
         sv = [sv1, sv2, sv3]
         binfsc, _, _ = core.fsc.anytwomaps_fsc_covariance(
             self.e0, ert, self.bin_idx, self.nbin)
         val_arr = np.zeros((self.nbin, 2), dtype='float')
         val_arr[:,0] = binfsc
-        wgrid = fcodes_fast.read_into_grid2(self.bin_idx,
+        wgrid = fcodes2.read_into_grid2(self.bin_idx,
             val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
 
         df = np.zeros(3, dtype="float")
@@ -363,20 +362,20 @@ class Bfgs_trans:
         binfsc, _, bincounts = core.fsc.anytwomaps_fsc_covariance(
             self.e0, self.ert, self.bin_idx, self.nbin)
         self.binfsc = binfsc
-        self.avgfsc = utils.get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
+        self.avgfsc = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
 
     def get_wght(self): 
         nz, ny, nx = self.e0.shape
         val_arr = np.zeros((self.nbin, 2), dtype='float')
         val_arr[:,0] = self.binfsc #/ (1 - self.binfsc ** 2)
-        self.wgrid = fcodes_fast.read_into_grid2(self.bin_idx,
+        self.wgrid = fcodes2.read_into_grid2(self.bin_idx,
             val_arr, self.nbin, nz, ny, nx)[:,:,:,0]
 
     #3. functional
     def functional(self, x):
         nx, ny, nz = self.e1.shape
         self.t = x
-        st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, self.t)
+        st, _, _, _ = fcodes2.get_st(nx, ny, nz, self.t)
         self.ert = self.e1 * st
         self.calc_fsc()
         self.get_wght()
