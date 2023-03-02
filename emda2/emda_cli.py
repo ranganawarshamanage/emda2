@@ -143,13 +143,14 @@ def find_pg(args):
 def make_mapmask(args):
     # generate density mask using halfmaps
     half1 = args.half1
+    half2 = args.half2
     if args.maskname is None:
         try:
             m = re.search('emd_(.+)_half', half1)
             maskname = 'emdamapmask_emd-%s.mrc'%m.group(1)
         except:
             maskname = 'emdamapmask_1.mrc'
-    if args.half2 is None:
+    if half2 is None:
         try:
             half2 = half1.replace("half_map_1", "half_map_2")
         except NameError as e:
