@@ -318,7 +318,7 @@ def main(h1, h2, emdbid):
         mode=0,
         nx=nx,ny=ny,nz=nz,
         )
-    fscweights = fcodes2.read_into_grid(bin_idx, fsc_str, nbin, nx, ny, nz)
+    #fscweights = fcodes2.read_into_grid(bin_idx, fsc_str, nbin, nx, ny, nz)
     fscweights_halfmap = fcodes2.read_into_grid(bin_idx, fsc_str_halfmap, nbin, nx, ny, nz)
     #writemap(fscweights, h1.workcell, emdbid+'_weights.mrc', h1.origin)
     e1 = e1 * fscweights_halfmap 
