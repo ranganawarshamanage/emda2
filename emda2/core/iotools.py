@@ -179,7 +179,7 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
         print("Resizing in Fourier space and transforming back")
         if fobj is not None:
             fobj.write("Resizing in Fourier space and transforming back \n")
-        new_arr = resample(arr, newsize, sf)
+        new_arr = resample(arr, newsize, sf=False)
         if np.any(np.array(new_arr.shape) < np.array(targt_dim)):
             print("pading image...")
             new_arr = padimage(new_arr, targt_dim)
@@ -263,7 +263,10 @@ def resample(x, newshape, sf):
     # nosampling
     if np.all((np.array(x.shape) - np.array(newshape)) == 0):
         print('no sampling')
-        return x
+        if sf:
+            return np.fft.fftshift(np.fft.fftn(x))
+        else:
+            return x
     # Forward transform
     X = np.fft.fftn(x)
     X = np.fft.fftshift(X)
