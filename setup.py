@@ -35,6 +35,7 @@ setup(name='emda2',
         'more_itertools',
         #'proshade',
         'proshade @ git+https://github.com/GaribMurshudov/proshade_mod1.git'
+        'scikit-image'
         ],
     ext_modules =[ex1],
     #test_suite='emda.tests',
