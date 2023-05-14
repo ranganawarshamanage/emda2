@@ -22,7 +22,7 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   if(mode == 1) debug = .TRUE.
   call cpu_time(start)
 
-  if(debug) print*, 'fcodes_fast...'
+  if(debug) print*, 'fcodes2...'
   startbin = 2
   bin_idx = -100
   s_grid = 0.0
@@ -57,47 +57,13 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
      step = (i + 0.5) * hkl
      call get_resol(uc,step(1),step(2),step(3),resol)
      if(debug) print*, i,step(1),step(2),step(3),resol
-     print*, nbin,resol
+     if(debug) print*, nbin,resol
      res_arr(nbin) = resol
      nbin = nbin + 1
   end do
-  print*, 'nbin=', nbin
+  if(debug) print*, 'nbin=', nbin
   high_res = res_arr(nbin-1)
   call get_resol(uc,0.0,0.0,0.0,low_res)
-
-  print*, 'Creating resolution grid. Please wait...'
-
-  ! Friedel's Law
-!!$  do i=xyzmin(1), xyzmax(1)
-!!$     do j=xyzmin(2), xyzmax(2)
-!!$        do k=xyzmin(3), 0
-!!$           call get_resol(uc,real(i),real(j),real(k),resol)
-!!$           s_grid(i,j,k) = 1.0/resol
-!!$           if(k/=xyzmin(3) .and. j/=xyzmin(2) .and. i/=xyzmin(1))then
-!!$              s_grid(-i,-j,-k) = s_grid(i,j,k)
-!!$           end if
-!!$           if(resol < high_res .or. resol > low_res) cycle
-!!$           ! Find the matching bin to resol
-!!$           do ibin = 0, nbin - 1
-!!$              val = sqrt((res_arr(ibin) - resol)**2)
-!!$              if(ibin == 0)then
-!!$                 tmp_val = val; tmp_min = val
-!!$                 mnloc = ibin 
-!!$              else
-!!$                 tmp_val = val
-!!$                 if(tmp_val < tmp_min)then
-!!$                    tmp_min = val
-!!$                    mnloc = ibin
-!!$                 end if
-!!$              end if
-!!$           end do
-!!$           bin_idx(i,j,k) = mnloc
-!!$           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
-!!$           bin_idx(-i,-j,-k) = mnloc
-!!$        end do
-!!$     end do
-!!$  end do
-
   ! Friedel's Law
   do i=xyzmin(1), xyzmax(1)
      do j=xyzmin(2), xyzmax(2)
@@ -109,7 +75,7 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
               s_grid(-i,-j,-k) = s_grid(i,j,k)
               ! Find the matching bin to resol
               do ibin = 0, nbin - 1
-                 val = sqrt((res_arr(ibin) - resol)**2)
+                 val = abs(res_arr(ibin) - resol)
                  if(ibin == 0)then
                     tmp_val = val; tmp_min = val
                     mnloc = ibin 
@@ -155,7 +121,7 @@ subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   if(mode == 1) debug = .TRUE.
   call cpu_time(start)
 
-  if(debug) print*, 'fcodes_fast...'
+  if(debug) print*, 'fcodes2...'
   bin_idx = -100
   s_grid = 0.0
   n = 0
@@ -191,17 +157,15 @@ subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
      call get_resol(uc,step(1),step(2),step(3),resol)
      if(debug) print*, i,step(1),step(2),step(3),resol
      !print*, i,step(1),step(2),step(3),resol
-     print*, i,resol
+     if(debug) print*, i,resol
      res_arr(i) = resol
      bin_arr(i) = i + 2.5
      nbin = i + 1
   end do
-  print*, 'nbin=', nbin
+  if(debug) print*, 'nbin=', nbin
   high_res = res_arr(nbin-1)
   call get_resol(uc,0.0,0.0,0.0,low_res)
   !print*,"Low res=",low_res,"High res=",high_res ,'A'
-
-  print*, 'Creating resolution grid. Please wait...'
 
   ! Friedel's Law
   do i=xyzmin(1), xyzmax(1)
@@ -261,8 +225,8 @@ subroutine resolution_grid_full(uc,highres,mode,maxbin,nx,ny,nz,resol_grid,s_gri
   if(debug) print*, 'xyzmax = ', xyzmax
   if(debug) print*, 'unit cell = ', uc
 
-  print*, 'Creating resolution grid. Please wait...'
-  print*, 'High resolution cutoff: ', highres, 'A'
+  if(debug) print*, 'Creating resolution grid. Please wait...'
+  if(debug) print*, 'High resolution cutoff: ', highres, 'A'
 
   do i=xyzmin(1), xyzmax(1)
      do j=xyzmin(2), xyzmax(2)
@@ -311,13 +275,13 @@ subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_i
    xyzmin(3) = int(-nxyz(3)/2)
    xyzmax    = -(xyzmin+1)
    !
-   print*, 'nbin=', nbin
+   if(debug) print*, 'nbin=', nbin
    high_res = res_arr(nbin-1)
    !call get_reciprocal_basis(uc, ucstar)
    call get_resol(uc,0.0,0.0,0.0,low_res)
    !call get_resol2(ucstar,0.0,0.0,0.0,low_res)
-   print*,"Low res=",low_res,"High res=",high_res ,'A'
-   print*, 'Creating resolution grid. Please wait...'
+   if(debug) print*,"Low res=",low_res,"High res=",high_res ,'A'
+   if(debug) print*, 'Creating resolution grid. Please wait...'
    ! Friedel's Law
    do i=xyzmin(1), xyzmax(1)
       do j=xyzmin(2), xyzmax(2)
@@ -331,7 +295,7 @@ subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_i
             if(resol < high_res .or. resol > low_res) cycle
             ! Find the matching bin to resol
             do ibin = 0, nbin - 1
-               val = sqrt((res_arr(ibin) - resol)**2)
+               val = abs(res_arr(ibin) - resol)
                if(ibin == 0)then
                   tmp_val = val; tmp_min = val
                   mnloc = ibin 
@@ -351,8 +315,7 @@ subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_i
    end do
    call cpu_time(finish)
    if(debug) print*, 'time for calculation(s) = ', finish-start
- end subroutine resolution_grid_from_given_resarr
-
+end subroutine resolution_grid_from_given_resarr
 
 subroutine make_resarr(uc,maxbin,res_arr,nbin,firststep)
   implicit none
@@ -591,7 +554,6 @@ subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz)
   !bindata[:,0:5] - A1_sum,B1_sum,A2_sum,B2_sum,A1A2_sum,B1B2_sum
   !bindata[:,6:9] - A1A1_sum,B1B1_sum,A2A2_sum,B2B2_sum
   !bindata[:,10:11] - F1_var,F2_var
-  !
   binstats = 0.0
   bindata = 0.0
   xmin = int(-nx/2); xmax = -(xmin+1)
@@ -601,14 +563,6 @@ subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz)
   !print*, maxval(bin_idx), minval(bin_idx)
   bin_arr_count = 0
   if(debug) print*, 'using hemisphere data...'
-!!$  do i=xmin, xmax
-!!$     do j=ymin, ymax
-!!$        do k=zmin, 0
-!!$           print*, bin_idx(i,j,k)
-!!$        end do
-!!$     end do
-!!$  end do
-!!$  stop
   do i=xmin, xmax
      do j=ymin, ymax
         do k=zmin, 0 !zmax
@@ -2746,27 +2700,16 @@ subroutine trilinear_sphere(RM,F,FRS,bin_idx,ncopies,mode,nx,ny,nz,ibin)
               c101 = F(x1(1),x0(2),x1(3),ic)
               c110 = F(x1(1),x1(2),x0(3),ic)
               c111 = F(x1(1),x1(2),x1(3),ic)
-              
               ! Interpolation along x direction
               c00 = c000 + (c100-c000)*xd(1)
               c01 = c001 + (c101-c001)*xd(1)
               c10 = c010 + (c110-c010)*xd(1)
               c11 = c011 + (c111-c011)*xd(1)
-!!$              c00 = c000*(1.0d0-xd(1)) + c100*xd(1) 
-!!$              c01 = c001*(1.0d0-xd(1)) + c101*xd(1) 
-!!$              c10 = c010*(1.0d0-xd(1)) + c110*xd(1) 
-!!$              c11 = c011*(1.0d0-xd(1)) + c111*xd(1) 
-              
               ! Interpolation along y direction
               c0 = c00 + (c10-c00)*xd(2)
               c1 = c01 + (c11-c01)*xd(2)
-!!$              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)    
-!!$              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)    
-              
               ! Interpolation along z direction
-              c = c0 + (c1-c0)*xd(3)
-!!$              c = c0*(1.0d0-xd(3)) + c1*xd(3)      
-              
+              c = c0 + (c1-c0)*xd(3)     
               FRS(h,k,l,ic) = c
               !if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
               FRS(-h,-k,-l,ic) = conjg(c)
