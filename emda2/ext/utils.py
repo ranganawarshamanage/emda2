@@ -6,7 +6,12 @@ This software is released under the
 Mozilla Public License, version 2.0; see LICENSE.
 """
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals,
+)
 import emda2.core as core
 from emda2.core import iotools, maptools
 import emda2.emda_methods2 as em
@@ -29,12 +34,13 @@ def lowpassmap_butterworth(fc, sgrid, smax, order=4):
         fc = np.fft.fftshift(np.fft.fftn(fc))
     order = 4  # order of the butterworth filter
     D = sgrid
-    d = 1.0 / smax # smax in Ansgtrom units
+    d = 1.0 / smax  # smax in Ansgtrom units
     # butterworth filter
     bwfilter = 1.0 / np.sqrt(1 + ((D / d) ** (2 * order)))
     fmap = fc * bwfilter
     lwpmap = np.real(np.fft.ifftn(np.fft.ifftshift(fmap)))
     return fmap, lwpmap
+
 
 def set_array(arr, thresh=0.0):
     set2zero = False
@@ -47,20 +53,21 @@ def set_array(arr, thresh=0.0):
             arr[i] = 0.0
     return arr
 
+
 def interpolate_cc(data):
     from scipy.interpolate import RegularGridInterpolator
 
     linx = np.linspace(0, data.shape[0], data.shape[0])
     liny = np.linspace(0, data.shape[1], data.shape[1])
     linz = np.linspace(0, data.shape[2], data.shape[2])
-    return RegularGridInterpolator(
-        (linx, liny, linz), data, method="nearest")
+    return RegularGridInterpolator((linx, liny, linz), data, method="nearest")
+
 
 def sphere_mask(nx):
     # Creating a sphere mask
     box_size = nx
-    box_radius = nx // 2 -1
-    center = [nx//2, nx//2, nx//2]
+    box_radius = nx // 2 - 1
+    center = [nx // 2, nx // 2, nx // 2]
     print("boxsize: ", box_size, "boxradius: ", box_radius, "center:", center)
     radius = box_radius
     X, Y, Z = np.ogrid[:box_size, :box_size, :box_size]
@@ -70,13 +77,15 @@ def sphere_mask(nx):
     mask = dist_from_center <= radius
     return mask
 
-def rotate_f(rotmat, f, interp='linear'):
+
+def rotate_f(rotmat, f, interp="linear"):
     if len(f.shape) == 3:
         f = np.expand_dims(f, axis=3)
     f_rotated = _interp(rotmat, f, interp)
     return f_rotated
 
-def _interp(RM, data, interp='linear'):
+
+def _interp(RM, data, interp="linear"):
     assert len(data.shape) == 4
     ih, ik, il, n = data.shape
     if interp == "cubic":
@@ -84,6 +93,39 @@ def _interp(RM, data, interp='linear'):
     if interp == "linear":
         interp3d = fc.trilinear(RM, data, debug_mode, n, ih, ik, il)
     return interp3d
+
+
+def rotate_f_within_sphere(rotmat, f, bin_idx, ibin):
+    """Returns a rotated copy of f
+
+    f is a stack of 3D complex arrays. This method rotates
+    each complex array by the given rotation matrix.
+    ibin defines the radius of the sphere to be roated. All the
+    Fourier coefficinets are roated within that sphere.
+    """
+    if len(f.shape) == 3:
+        f = np.expand_dims(f, axis=3)
+    nx, ny, nz, ncopies = f.shape
+    return fc.trilinear_sphere(
+        rotmat, f, bin_idx, 0, ibin, ncopies, nx, ny, nz
+    )
+
+
+def get_xyz_sum(xyz):
+    xyz_sum = np.zeros(shape=(6), dtype="float")
+    n = -1
+    for i in range(3):
+        for j in range(3):
+            if i == 0:
+                sumxyz = np.sum(xyz[i] * xyz[j])
+            elif i > 0 and j >= i:
+                sumxyz = np.sum(xyz[i] * xyz[j])
+            else:
+                continue
+            n = n + 1
+            xyz_sum[n] = sumxyz
+    return xyz_sum
+
 
 def shift_density(arr, shift):
     """Returns a shifted copy of the input array.
@@ -103,6 +145,7 @@ def shift_density(arr, shift):
 
     # return ndimage.interpolation.shift(arr, shift)
     return ndimage.shift(arr, shift, mode="wrap")
+
 
 def center_of_mass_density(arr):
     """Returns the center of mass of 3D density array.
@@ -130,34 +173,15 @@ def cut_resolution_for_linefit(f_list, bin_idx, res_arr, smax):
     dx = int((nx - 2 * cx) / 2)
     dy = int((ny - 2 * cx) / 2)
     dz = int((nz - 2 * cx) / 2)
-    cBIdx = bin_idx[dx: dx + 2 * cx, dy: dy + 2 * cx, dz: dz + 2 * cx]
+    cBIdx = bin_idx[dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
     fout = fc.cutmap_arr(
         f_arr, bin_idx, cbin, 0, len(res_arr), nx, ny, nz, len(f_list)
-    )[:, dx: dx + 2 * cx, dy: dy + 2 * cx, dz: dz + 2 * cx]
+    )[:, dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
     return fout, cBIdx, cbin
 
-def determine_ibin(bin_fsc, cutoff=0.15):
-    bin_fsc = filter_fsc(bin_fsc)
-    #print('filtered FSC:')
-    #print(bin_fsc)
-    ibin = get_ibin(bin_fsc, cutoff)        
-    """ i = 0
-    while ibin < 5:
-        cutoff -= 0.01
-        ibin = get_ibin(bin_fsc, max([cutoff, 0.1]))
-        i += 1
-        if i > 100:
-            print('ibin: ', ibin)
-            print("Fit starting configurations are too far.")
-            raise SystemExit()
-    if ibin == 0:
-        print('ibin: ', 0)
-        print("Fit starting configurations are too far.")
-        raise SystemExit() """
-    return ibin
 
 def filter_fsc(bin_fsc, thresh=0.05):
-    bin_fsc_new = np.zeros(bin_fsc.shape, 'float')
+    bin_fsc_new = np.zeros(bin_fsc.shape, "float")
     for i, ifsc in enumerate(bin_fsc):
         if ifsc >= thresh:
             bin_fsc_new[i] = ifsc
@@ -165,6 +189,7 @@ def filter_fsc(bin_fsc, thresh=0.05):
             if i > 1:
                 break
     return bin_fsc_new
+
 
 def get_ibin(bin_fsc, cutoff):
     # search from rear end
@@ -175,8 +200,21 @@ def get_ibin(bin_fsc, cutoff):
             if ibin % 2 != 0:
                 ibin = ibin - 1
             break
-    #print('get_ibin, ibin: ', ibin)
     return ibin
+
+
+def determine_ibin(bin_fsc, cutoff=0.15):
+    return get_ibin(filter_fsc(bin_fsc), cutoff)
+
+
+def get_avg_fsc(binfsc, bincounts):
+    fsc_filtered = filter_fsc(bin_fsc=binfsc, thresh=0.0)
+    fsc_avg = np.average(
+        a=fsc_filtered[np.nonzero(fsc_filtered)],
+        weights=bincounts[np.nonzero(fsc_filtered)],
+    )
+    return fsc_avg
+
 
 def rebox2cube(arr):
     nx, ny, nz = arr.shape
@@ -186,9 +224,10 @@ def rebox2cube(arr):
     dx = (maxdim - nx) // 2
     dy = (maxdim - ny) // 2
     dz = (maxdim - nz) // 2
-    newarr  = np.zeros((maxdim, maxdim, maxdim), 'float')
-    newarr[dx:dx+nx, dy:dy+ny, dz:dz+nz] = arr
+    newarr = np.zeros((maxdim, maxdim, maxdim), "float")
+    newarr[dx : dx + nx, dy : dy + ny, dz : dz + nz] = arr
     return newarr
+
 
 def rebox_using_radius(arr, padwidth=10, rad=None):
     """
@@ -203,7 +242,7 @@ def rebox_using_radius(arr, padwidth=10, rad=None):
     Outputs:
         newarr: reboxed array
     """
-    arrshape = np.array(arr.shape, 'int')
+    arrshape = np.array(arr.shape, "int")
     if np.sum(arrshape - np.amax(arrshape)) != 0:
         arr = rebox2cube(arr)
     nx, ny, nz = arr.shape
@@ -211,24 +250,29 @@ def rebox_using_radius(arr, padwidth=10, rad=None):
         rad = nx // 2
     if rad <= 0:
         raise SystemExit("rad CANNOT BE negative or zero!")
-    assert rad <= nx//2
-    x1 = y1 = z1 = nx//2 - rad
-    x2 = y2 = z2 = x1 + 2*rad
+    assert rad <= nx // 2
+    x1 = y1 = z1 = nx // 2 - rad
+    x2 = y2 = z2 = x1 + 2 * rad
     dimz = z2 - z1
     dimy = y2 - y1
     dimx = x2 - x1
     dim = np.max([dimz, dimy, dimx])
     if dim % 2 != 0:
         dim += 1
-    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    newarr = np.zeros(
+        (dim + padwidth * 2, dim + padwidth * 2, dim + padwidth * 2), "float"
+    )
     dx = (dim - dimx) // 2
     dy = (dim - dimy) // 2
     dz = (dim - dimz) // 2
     dx += padwidth
     dy += padwidth
     dz += padwidth
-    newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
+    newarr[dz : dz + dimz, dy : dy + dimy, dx : dx + dimx] = arr[
+        z1:z2, y1:y2, x1:x2
+    ]
     return newarr
+
 
 """ def rebox_using_mask(arr, mask, padwidth=10):
     mask = mask * (mask > 1.e-5)
@@ -254,22 +298,27 @@ def rebox_using_radius(arr, padwidth=10, rad=None):
     newmask[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = mask[z1:z2, y1:y2, x1:x2]
     return newarr, newmask """
 
+
 def rebox_using_mask(arr, mask, mask_origin, padwidth=10):
-    mask = mask * (mask > 1.e-5)
+    mask = mask * (mask > 1.0e-5)
     mo1, mo2, mo3 = mask_origin
     i, j, k = np.nonzero(mask)
     z2, y2, x2 = np.max(i), np.max(j), np.max(k)
-    #z2, y2, x2 = z2+mo1, y2+mo2, x2+mo3
+    # z2, y2, x2 = z2+mo1, y2+mo2, x2+mo3
     z1, y1, x1 = np.min(i), np.min(j), np.min(k)
-    #z1, y1, x1 = z1+mo1, y1+mo2, x1+mo3
+    # z1, y1, x1 = z1+mo1, y1+mo2, x1+mo3
     dimz = z2 - z1
     dimy = y2 - y1
     dimx = x2 - x1
     dim = np.max([dimz, dimy, dimx])
     if dim % 2 != 0:
         dim += 1
-    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
-    newmask = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    newarr = np.zeros(
+        (dim + padwidth * 2, dim + padwidth * 2, dim + padwidth * 2), "float"
+    )
+    newmask = np.zeros(
+        (dim + padwidth * 2, dim + padwidth * 2, dim + padwidth * 2), "float"
+    )
     print((dim - dimz), (dim - dimy), (dim - dimx))
     dz = (dim - dimz) // 2
     dy = (dim - dimy) // 2
@@ -278,23 +327,27 @@ def rebox_using_mask(arr, mask, mask_origin, padwidth=10):
     dy += padwidth
     dx += padwidth
     #
-    z1arr = z1#+mo1
-    z2arr = z2#+mo1
-    y1arr = y1#+mo2
-    y2arr = y2#+mo2
-    x1arr = x1#+mo3
-    x2arr = x2#+mo3
+    z1arr = z1  # +mo1
+    z2arr = z2  # +mo1
+    y1arr = y1  # +mo2
+    y2arr = y2  # +mo2
+    x1arr = x1  # +mo3
+    x2arr = x2  # +mo3
     nx, ny, nz = arr.shape
     try:
         assert z1arr < z2arr <= nz
         assert y1arr < y2arr <= ny
         assert x1arr < x2arr <= nx
         # non-cubic box
-        #newarr = arr[z1+mo1:z2+mo1, y1+mo2:y2+mo2, x1+mo3:x2+mo3]
-        #newmask = mask[z1:z2, y1:y2, x1:x2]
+        # newarr = arr[z1+mo1:z2+mo1, y1+mo2:y2+mo2, x1+mo3:x2+mo3]
+        # newmask = mask[z1:z2, y1:y2, x1:x2]
         # cubic box
-        newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1arr:z2arr, y1arr:y2arr, x1arr:x2arr]
-        newmask[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = mask[z1:z2, y1:y2, x1:x2]
+        newarr[dz : dz + dimz, dy : dy + dimy, dx : dx + dimx] = arr[
+            z1arr:z2arr, y1arr:y2arr, x1arr:x2arr
+        ]
+        newmask[dz : dz + dimz, dy : dy + dimy, dx : dx + dimx] = mask[
+            z1:z2, y1:y2, x1:x2
+        ]
         return newarr, newmask
     except Exception as e:
         print(e)
@@ -325,5 +378,6 @@ def rebox_using_model(imap, model):
     maptools.model_rebox(mask=mm.arr, mmcif_file=model, uc=m1.cell)
     return reboxed_arr, reboxed_mask
 
+
 def vec2string(vec):
-    return " ".join(("% .3f"%x for x in vec))
+    return " ".join(("% .3f" % x for x in vec))
