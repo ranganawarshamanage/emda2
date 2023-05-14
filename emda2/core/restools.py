@@ -6,7 +6,12 @@ This software is released under the
 Mozilla Public License, version 2.0; see LICENSE.
 """
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals,
+)
 
 import numpy as np
 import fcodes2
@@ -60,8 +65,10 @@ def create_kernel(fResArr, smax):
     mask = dist_from_center <= radius
     return mask
 
+
 def create_binary_kernel(r1):
     from math import sqrt
+
     #
     boxsize = 2 * r1 + 1
     kern_sphere = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
@@ -71,15 +78,18 @@ def create_binary_kernel(r1):
     for i in range(kx):
         for j in range(ky):
             for k in range(kz):
-                dist = sqrt((i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2)
+                dist = sqrt(
+                    (i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2
+                )
                 if dist < r1:
                     kern_sphere[i, j, k] = 1
     return kern_sphere
 
 
 def create_soft_edged_kernel(fResArr, smax):
-    # Create soft-edged-kernel. smax is resolution 
+    # Create soft-edged-kernel. smax is resolution
     from math import sqrt, cos
+
     #
     mask = create_kernel(fResArr, smax)
     kern_sphere = mask / np.sum(mask)  # Normalized mask
@@ -97,7 +107,9 @@ def create_soft_edged_kernel(fResArr, smax):
         for j in range(ky):
             for k in range(kz):
                 dist = sqrt(
-                    (i - center[0]) ** 2 + (j - center[0]) ** 2 + (k - center[0]) ** 2
+                    (i - center[0]) ** 2
+                    + (j - center[0]) ** 2
+                    + (k - center[0]) ** 2
                 )
                 if dist <= r1:
                     if dist < r0:
@@ -118,17 +130,21 @@ def create_soft_edged_kernel_pxl(r1):
         boxsize = 5
     else:
         boxsize = 2 * r1 + 1
-    kern_sphere_soft = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
+    kern_sphere_soft = np.zeros(
+        shape=(boxsize, boxsize, boxsize), dtype="float"
+    )
     kx = ky = kz = boxsize
     center = boxsize // 2
-    #print("center: ", center)
+    # print("center: ", center)
     r1 = center
     r0 = r1 - 2
-    #print("r1: ", r1, "r0: ", r0)
+    # print("r1: ", r1, "r0: ", r0)
     for i in range(kx):
         for j in range(ky):
             for k in range(kz):
-                dist = sqrt((i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2)
+                dist = sqrt(
+                    (i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2
+                )
                 if dist < r1:
                     if dist < r0:
                         kern_sphere_soft[i, j, k] = 1
@@ -145,7 +161,9 @@ def softedgekernel_5x5():
     from math import sqrt, cos
 
     boxsize = 5
-    kern_sphere_soft = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
+    kern_sphere_soft = np.zeros(
+        shape=(boxsize, boxsize, boxsize), dtype="float"
+    )
     kx = ky = kz = boxsize
     center = boxsize // 2
     r1 = center
@@ -153,7 +171,9 @@ def softedgekernel_5x5():
     for i in range(kx):
         for j in range(ky):
             for k in range(kz):
-                dist = sqrt((i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2)
+                dist = sqrt(
+                    (i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2
+                )
                 if dist < r1:
                     if dist <= r0:
                         kern_sphere_soft[i, j, k] = 1
