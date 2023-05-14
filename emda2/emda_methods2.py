@@ -8,13 +8,18 @@ Copyright - R. Warshamanage and G. N. Murshudov
 from emda2.core import iotools, maptools, restools, fsctools
 import fcodes2
 import numpy as np
-from numpy.fft import fftshift, ifftshift, fftn, ifftn
+import gemmi, shutil, os
+from numpy.fft import fftshift, fftn
 
 debug_mode = 0
 
+
 def get_binidx(cell, arr):
-    nbin, res_arr, bin_idx, sgrid = restools.get_resolution_array(uc=cell, hf1=arr)
+    nbin, res_arr, bin_idx, sgrid = restools.get_resolution_array(
+        uc=cell, hf1=arr
+    )
     return nbin, res_arr, bin_idx, sgrid
+
 
 def get_map_power(fo, bin_idx, nbin):
     """Calculates the map power spectrum.
@@ -31,6 +36,7 @@ def get_map_power(fo, bin_idx, nbin):
     """
     power_spectrum = maptools.get_map_power(fo=fo, bin_idx=bin_idx, nbin=nbin)
     return power_spectrum
+
 
 def get_normalized_sf(fo, bin_idx, nbin):
     """Calculates normalised Fourier coefficients.
@@ -52,9 +58,12 @@ def get_normalized_sf(fo, bin_idx, nbin):
         bin_idx=bin_idx,
         nbin=nbin,
         mode=0,
-        nx=nx,ny=ny,nz=nz,
-        )
+        nx=nx,
+        ny=ny,
+        nz=nz,
+    )
     return eo
+
 
 def fsc(f1, f2, bin_idx, nbin, fobj=None, xmlobj=None):
     """Returns Fourier Shell Correlation (FSC) between any two maps.
@@ -63,7 +72,7 @@ def fsc(f1, f2, bin_idx, nbin, fobj=None, xmlobj=None):
 
     Arguments:
         Inputs:
-            f1, f2: complex Fourier coefficients, ndarray 
+            f1, f2: complex Fourier coefficients, ndarray
                 Corresponding to map1 and map2
             bin_idx: 3D grid of bin numbers, integer
             nbin: number of resolution bins, integer
@@ -72,9 +81,10 @@ def fsc(f1, f2, bin_idx, nbin, fobj=None, xmlobj=None):
             bin_fsc: float, 1D array
                 FSC in each resolution bin.
     """
-    import os
+
     bin_fsc = fsctools.anytwomaps_fsc_covariance(f1, f2, bin_idx, nbin)[0]
     return bin_fsc
+
 
 def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin, filename=None):
     """Computes Fourier Shell Correlation (FSC) using half maps.
@@ -87,7 +97,7 @@ def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin, filename=None):
             f_hf1, f_hf2: complex Fourier coefficients of
                 halfmap1 and halfmap2. ndarrays
             bin_idx: 3D grid of bin numbers, integer
-            nbin: number of resolution bins, integer            
+            nbin: number of resolution bins, integer
 
         Outputs:
             bin_fsc: float, 1D array
@@ -102,7 +112,14 @@ def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin, filename=None):
         bin_fsc,
         bincount,
     ) = fcodes2.calc_fsc_using_halfmaps(
-        f_hf1, f_hf2, bin_idx, nbin, debug_mode, f_hf1.shape[0], f_hf1.shape[1], f_hf1.shape[2]
+        f_hf1,
+        f_hf2,
+        bin_idx,
+        nbin,
+        debug_mode,
+        f_hf1.shape[0],
+        f_hf1.shape[1],
+        f_hf1.shape[2],
     )
     return bin_fsc
 
@@ -152,28 +169,43 @@ def mask_from_map(
 
     _, arrlp = lowpass_map(uc, arr, resol, filter, order=order)
     mask = maskmap_class.mapmask(
-        arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
+        arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr
+    )
     return mask, arrlp
+
 
 def mask_from_map_connectedpixels(m1, binthresh=None):
     """
     This method generates a mask from a given map based on their
-    pixel connectivity. Connectivity is searched on a lowpass map to 
-    15 A. 
+    pixel connectivity. Connectivity is searched on a lowpass map to
+    15 A.
 
     Inputs:
         m1: map object from EMDA2.
         binthresh: binarisation threshold for lowpass map. default is
             max_density_value * 0.1
-    
+
     Outputs:
         masklist: sorted masks according to their rmsd (largest first)
     """
     from emda2.ext.mapmask import mapmask_connectedpixels
-    masklist, lowpassmap = mapmask_connectedpixels(m1, binary_threshold=binthresh)
+
+    masklist, lowpassmap = mapmask_connectedpixels(
+        m1, binary_threshold=binthresh
+    )
     return masklist
 
-def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=None, res_arr=None):
+
+def lowpass_map(
+    uc,
+    arr1,
+    resol,
+    filter="ideal",
+    order=4,
+    bin_idx=None,
+    sgrid=None,
+    res_arr=None,
+):
     """Lowpass filters a map to a specified resolution.
 
     This function applies a lowpass filter on a map to a specified resolution.
@@ -184,7 +216,7 @@ def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=No
                 Unit cell params.
             arr1: float or complex, 3D numpy array
                 Real space map or corresponding Fourier coefficients.
-                if Fourier coefficients, the zero-frequency component should be 
+                if Fourier coefficients, the zero-frequency component should be
                 at the center of the spectrum.
             resol: float
                 Resolution cutoff for lowpass filtering in Angstrom units.
@@ -199,7 +231,7 @@ def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=No
             sgrid: float, ndarray
                 labelled grid of bin by resolution
             res_arr: float, 1D array, optional
-                resolution array 
+                resolution array
 
         Outputs:
             fmap1: complex, 3D array
@@ -214,18 +246,30 @@ def lowpass_map(uc, arr1, resol, filter="ideal", order=4, bin_idx=None, sgrid=No
             nbin, res_arr, bin_idx, sgrid = get_binidx(cell=uc, arr=arr1)
         dist = np.sqrt((res_arr - resol) ** 2)
         cbin = np.argmin(dist) + 1
-        fmap1, map1 = utils.lowpassmap_ideal(fc=arr1, bin_idx=bin_idx, cbin=cbin)
+        fmap1, map1 = utils.lowpassmap_ideal(
+            fc=arr1, bin_idx=bin_idx, cbin=cbin
+        )
     elif filter == "butterworth":
         if sgrid is None or res_arr is None:
             nbin, res_arr, bin_idx, sgrid = get_binidx(cell=uc, arr=arr1)
         dist = np.sqrt((res_arr - resol) ** 2)
         cbin = np.argmin(dist) + 1
-        fmap1, map1 = utils.lowpassmap_butterworth(fc=arr1, 
-                        sgrid=sgrid, smax=resol, order=4)
+        fmap1, map1 = utils.lowpassmap_butterworth(
+            fc=arr1, sgrid=sgrid, smax=resol, order=4
+        )
     return fmap1, map1
 
-def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, shift_to_boxcenter=False,):
-    """ Calculates map from the coordinates
+
+def model2map_gm(
+    modelxyz,
+    resol,
+    dim,
+    cell,
+    maporigin=None,
+    outputpath=None,
+    shift_to_boxcenter=False,
+):
+    """Calculates map from the coordinates
 
     Arguments:
         Inputs:
@@ -242,7 +286,7 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
             maporigin: list of int, optional
                 Origin of the map to be calculated. default to [0, 0, 0]
             outputpath: string, optional
-                Path for auxilliary files. 
+                Path for auxilliary files.
                 default to './emda_gemmifiles'
             shift_to_boxcenter: bool, optional
                 If True, the image/molecule is centered in the box.
@@ -250,17 +294,17 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
         Outputs:
             Returns the model-based map as a 3D numpy array.
     """
-    import gemmi, shutil, os
+
     from servalcat.utils.model import calc_fc_fft
 
     if outputpath is None:
         outputpath = os.getcwd()
-    outputpath = os.path.join(outputpath, 'emda_gemmifiles/')
-    print('outputpath: ', outputpath)
+    outputpath = os.path.join(outputpath, "emda_gemmifiles/")
+    print("outputpath: ", outputpath)
     # make director for files for refmac run
     if os.path.exists(outputpath):
         shutil.rmtree(outputpath)
-    os.mkdir(outputpath) 
+    os.mkdir(outputpath)
     # check for valid sampling:
     for i in range(3):
         if dim[i] % 2 != 0:
@@ -275,35 +319,42 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
         if min_dim[0] > dim[0]:
             print("Requested dims: ", dim)
             print("Minimum dims needed (for requested resolution): ", min_dim)
-            print("!!! Please lower the requested resolution or increase the grid dimensions !!!")
+            print(
+                "!!! Please lower the requested resolution or increase the"
+                " grid dimensions !!!"
+            )
             raise SystemExit()
     if shift_to_boxcenter:
-        from emda.core.modeltools import shift_to_origin,shift_model
+        from emda.core.modeltools import shift_to_origin, shift_model
+
         doc = shift_to_origin(modelxyz)
-        doc.write_file(outputpath+"model1.cif")
-        modelxyz = outputpath+"model1.cif"
+        doc.write_file(outputpath + "model1.cif")
+        modelxyz = outputpath + "model1.cif"
     a, b, c = cell[:3]
     st = gemmi.read_structure(modelxyz)
     st.spacegroup_hm = "P 1"
-    st.cell.set(a, b, c, 90., 90., 90.)
-    st.make_mmcif_document().write_file(outputpath+"model.cif")
-    asu_data = calc_fc_fft(st=st, 
-                           d_min=resol, 
-                           source='electron', 
-                           mott_bethe=True)
+    st.cell.set(a, b, c, 90.0, 90.0, 90.0)
+    st.make_mmcif_document().write_file(outputpath + "model.cif")
+    asu_data = calc_fc_fft(
+        st=st, d_min=resol, source="electron", mott_bethe=True
+    )
     griddata = asu_data.get_f_phi_on_grid(dim)
     griddata_np = (np.array(griddata, copy=False)).transpose()
     modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
-    if np.sum(np.asarray(modelmap.shape, 'int') - np.asarray(dim, 'int')) != 0:
-        cpix = [cell[i]/shape for i, shape in enumerate(modelmap.shape)]
-        tpix = [cell[i]/shape for i, shape in enumerate(dim)]
-        modelmap = iotools.resample_data(curnt_pix=cpix, targt_pix=tpix, arr=modelmap, targt_dim=dim)
+    if np.sum(np.asarray(modelmap.shape, "int") - np.asarray(dim, "int")) != 0:
+        cpix = [cell[i] / shape for i, shape in enumerate(modelmap.shape)]
+        tpix = [cell[i] / shape for i, shape in enumerate(dim)]
+        modelmap = iotools.resample_data(
+            curnt_pix=cpix, targt_pix=tpix, arr=modelmap, targt_dim=dim
+        )
     if shift_to_boxcenter:
-        maporigin = None # no origin shift allowed
-        modelmap = np.fft.fftshift(modelmap) #bring modelmap to boxcenter
+        maporigin = None  # no origin shift allowed
+        modelmap = np.fft.fftshift(modelmap)  # bring modelmap to boxcenter
         # shift model to boxcenter
-        doc = shift_model(mmcif_file=outputpath+"model.cif", shift=[a/2, b/2, c/2])
-        doc.write_file(outputpath+"emda_shifted_model.cif")
+        doc = shift_model(
+            mmcif_file=outputpath + "model.cif", shift=[a / 2, b / 2, c / 2]
+        )
+        doc.write_file(outputpath + "emda_shifted_model.cif")
     if maporigin is None:
         maporigin = [0, 0, 0]
     else:
@@ -315,7 +366,8 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
             -shift_z,
             axis=2,
         )
-    return np.transpose(modelmap) # it seems the transpose is necessary
+    return np.transpose(modelmap)  # it seems the transpose is necessary
+
 
 def realsp_correlation(
     arr_hf1,
@@ -374,6 +426,7 @@ def realsp_correlation(
     rcc.rcc()
     return rcc
 
+
 def resample_data(curnt_pix, targt_pix, arr, targt_dim=None):
     """Resamples a 3D data array.
 
@@ -383,7 +436,7 @@ def resample_data(curnt_pix, targt_pix, arr, targt_dim=None):
             targt_pix: float list, Target pixel sizes along a, b c.
             arr: float, 3D array of map values.
             targt_dim: int list, Target sampling along x, y, z.
-            
+
         Outputs:
             new_arr: float, 3D array
                 Resampled 3D array.
@@ -392,6 +445,7 @@ def resample_data(curnt_pix, targt_pix, arr, targt_dim=None):
         curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=targt_dim, arr=arr
     )
     return new_arr
+
 
 def apply_bfactor_to_map(f, bf_arr, uc):
     """Applies an array of B-factors on the map.
@@ -412,10 +466,9 @@ def apply_bfactor_to_map(f, bf_arr, uc):
                 e.g. all_mapout[:,:,:,i], where i represents map number
                 corresponding to the B-factor in bf_arr.
     """
-    all_mapout = maptools.apply_bfactor_to_map(
-        fmap=f, bf_arr=bf_arr, uc=uc
-    )
+    all_mapout = maptools.apply_bfactor_to_map(fmap=f, bf_arr=bf_arr, uc=uc)
     return all_mapout
+
 
 def map2mtz(arr, uc, mtzname="map2mtz.mtz", resol=None):
     """Convert map into MTZ format.
@@ -435,6 +488,7 @@ def map2mtz(arr, uc, mtzname="map2mtz.mtz", resol=None):
             Outputs MTZ file.
     """
     maptools.map2mtz(arr=arr, uc=uc, mtzname=mtzname, resol=resol)
+
 
 def mtz2map(mtzname, map_size):
     """Converts an MTZ file into MRC format.
@@ -456,6 +510,7 @@ def mtz2map(mtzname, map_size):
     arr, unit_cell = maptools.mtz2map(mtzname=mtzname, map_size=map_size)
     return np.transpose(arr), unit_cell
 
+
 def half2full(hf1arr, hf2arr):
     """Combines half maps to generate full map.
 
@@ -470,6 +525,7 @@ def half2full(hf1arr, hf2arr):
     f1 = np.fft.fftn(hf1arr)
     f2 = np.fft.fftn(hf2arr)
     return np.real(np.fft.ifftn((f1 + f2) / 2.0))
+
 
 def mask_from_atomic_model(mapname, modelname, atmrad=3):
     """Generates a mask from atomic coordinates.
@@ -499,11 +555,13 @@ def mask_from_atomic_model(mapname, modelname, atmrad=3):
     """
     from emda2.ext.maskmap_class import mask_from_coordinates
 
-    mapobj = mask_from_coordinates(mapname=mapname, 
-                                 modelname=modelname, 
-                                 atmrad=atmrad, 
-                                 )
+    mapobj = mask_from_coordinates(
+        mapname=mapname,
+        modelname=modelname,
+        atmrad=atmrad,
+    )
     return mapobj
+
 
 def realsp_correlation_mapmodel(
     uc,
@@ -534,11 +592,7 @@ def realsp_correlation_mapmodel(
     """
     from emda2.ext import realsp_local
 
-    _, arr1 = lowpass_map(
-        uc=uc, 
-        arr1=map, 
-        resol=resol, 
-        filter='butterworth')
+    _, arr1 = lowpass_map(uc=uc, arr1=map, resol=resol, filter="butterworth")
     mapmodel_rcc, kern_rad = realsp_local.mapmodel_rcc(
         arr1=arr1,
         model_arr=model,
@@ -547,30 +601,35 @@ def realsp_correlation_mapmodel(
     )
     return mapmodel_rcc, kern_rad
 
+
 def overlay(
-    arrlist, 
-    pixlist, 
-    cell, 
-    origin, 
-    nocom=False, 
-    optmethod=None, 
-    tlist=None, 
-    qlist=None, 
+    arrlist,
+    pixlist,
+    cell,
+    origin,
+    nocom=False,
+    optmethod=None,
+    tlist=None,
+    qlist=None,
     fitres=None,
     r_only=False,
     t_only=False,
-    ):
+):
     from emda2.ext import utils
+
     maplist = []
     mask = utils.sphere_mask(arrlist[0].shape[0])
     maplist.append(arrlist[0] * mask)
     for i, arr in enumerate(arrlist[1:], start=1):
-        resampled_arr = resample_data(curnt_pix=pixlist[i], 
-                                      targt_pix=pixlist[0], 
-                                      arr=arr, 
-                                      targt_dim=arrlist[0].shape)
+        resampled_arr = resample_data(
+            curnt_pix=pixlist[i],
+            targt_pix=pixlist[0],
+            arr=arr,
+            targt_dim=arrlist[0].shape,
+        )
         maplist.append(resampled_arr * mask)
     from emda2.ext import overlay
+
     if r_only:
         emmap1 = overlay.EmmapOverlay(map_list=maplist, nocom=True)
     else:
@@ -582,26 +641,39 @@ def overlay(
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
     if tlist is None:
-        tlist = [[0., 0., 0.] for _ in range(len(arrlist))]
+        tlist = [[0.0, 0.0, 0.0] for _ in range(len(arrlist))]
     if qlist is None:
-        qlist = [[1., 0., 0., 0.] for _ in range(len(arrlist))]
+        qlist = [[1.0, 0.0, 0.0, 0.0] for _ in range(len(arrlist))]
     emmap1, rotmat_list, trans_list = overlay.overlay(
         emmap1=emmap1,
-        tlist=tlist, 
-        qlist=qlist, 
-        ncycles=100, 
-        fitres=fitres, 
+        tlist=tlist,
+        qlist=qlist,
+        ncycles=100,
+        fitres=fitres,
         optmethod=optmethod,
         r_only=r_only,
         t_only=t_only,
-        )
+    )
     return emmap1, rotmat_list, trans_list
+
 
 def refine_magnification():
     pass
 
+
 def refine_axis(
-    m1, axis, symorder, fitres=6, fitfsc=0.5, optmethod='nelder-mead', fobj=None, t_init=None, res_arr=None, bin_idx=None, nbin=None):
+    m1,
+    axis,
+    symorder,
+    fitres=6,
+    fitfsc=0.5,
+    optmethod="nelder-mead",
+    fobj=None,
+    t_init=None,
+    res_arr=None,
+    bin_idx=None,
+    nbin=None,
+):
     """
     Inputs:
         m1: Map object made with iotools.Map()
@@ -622,7 +694,7 @@ def refine_axis(
     from emda2.ext import axis_refinement
 
     if fobj is None:
-        fobj = open('emda_axis-refine.txt', 'w')
+        fobj = open("emda_axis-refine.txt", "w")
 
     emmap1 = axis_refinement.EmmapOverlay(arr=m1.workarr)
     emmap1.map_unit_cell = m1.workcell
@@ -631,7 +703,7 @@ def refine_axis(
     emmap1.nbin = nbin
     emmap1.map_dim = m1.workarr.shape
     emmap1.map_unit_cell = m1.workcell
-    emmap1.pix = [m1.workcell[i]/sh for i, sh in enumerate(m1.workarr.shape)]
+    emmap1.pix = [m1.workcell[i] / sh for i, sh in enumerate(m1.workarr.shape)]
     emmap1.prep_data()
     if t_init is None:
         t_init = [0.0, 0.0, 0.0]
@@ -648,13 +720,16 @@ def refine_axis(
     )
     return final_ax, final_t, ax_pos
 
+
 def get_rotation_center(m1, mm, axis, order, resol):
     from emda2.ext.sym import get_rotation_center
+
     results = get_rotation_center.get_rotation_center(
         m1=m1, mm=mm, axis=axis, order=order, claimed_res=resol
     )
     rotation_center = results[2]
     return rotation_center
+
 
 def rebox_by_mask(arr, mask, mask_origin, padwidth=10):
     """
@@ -669,33 +744,104 @@ def rebox_by_mask(arr, mask, mask_origin, padwidth=10):
         reboxed_mask: ndarray, reboxed mask
     """
     from emda2.ext.utils import rebox_using_mask
+
     reboxed_map, reboxed_mask = rebox_using_mask(
-        arr=arr, 
-        mask=mask, 
-        mask_origin=mask_origin,
-        padwidth=padwidth)
+        arr=arr, mask=mask, mask_origin=mask_origin, padwidth=padwidth
+    )
     return reboxed_map, reboxed_mask
 
 
-def flip_arr(arr, axis='z'):
+def flip_arr(arr, axis="z"):
     # axis to flip
     try:
-        if axis == 'x': ax = 0
-        if axis == 'y': ax = 1
-        if axis == 'z': ax = 2
+        if axis == "x":
+            ax = 0
+        if axis == "y":
+            ax = 1
+        if axis == "z":
+            ax = 2
         return np.flip(m=arr, axis=ax)
     except Exception as e:
         raise e
 
+
 def get_pointgroup(
-    half1, mask, resol4axref=float(5), output_maps=False, symaverage=False, resol=None):
+    half1,
+    half2,
+    resol,
+    resol4axref=5.0,
+    output_maps=False,
+    symaverage=False,
+    mask=None,
+    axlist=None,
+    orderlist=None,
+    fsclist=None,
+    user_pg=None,
+    label=None,
+):
+    """
+    Determines the point group of the map
+
+    Inputs:
+        half1, half2: required strings
+                half maps are required
+        resol: required float
+                nominal resolution of the map
+        mask: optional string
+                mask name
+        axlist: optional
+                Initial axes of [tentative] point group.
+                Should be given as X1 Y1 Z1 X2 Y2 Z2 format
+        orderlist: optional
+                Initial orders of axes.
+                Should be given as Order-of-axis1 Order-of-axis2 format
+        fsclist: optional
+                FSCs of axes.
+                Should be given as FSC-of-axis1 FSC-of-axis2 format
+        resol4axref: optional float
+                resolution for axis refinement default to 5 A.
+        output_maps: optional bool
+                if True maps will be written out. Dafault to False
+        symaverage: optional bool
+                if True maps will be symmetry averaged. Default to False
+        user_pg: optional string
+                user claimed point group for logging
+        label: optional string
+                label to use for logging and map output
+
+    Outputs:
+        Dictionary with all the meta data
+    """
     from emda2.ext.sym.symanalysis_pipeline import main
-    results = main(
-        half1=half1, imask=mask, resol=resol,
-        resol4axref=resol4axref, output_maps=output_maps,
-        symaverage=symaverage)
+
+    if axlist is not None:
+        assert len(axlist) // 3 == len(orderlist)
+        grouped_axlist = [axlist[i : i + 3] for i in range(0, len(axlist), 3)]
+    else:
+        grouped_axlist = axlist
+
+    params = {
+        "half1": half1,
+        "half2": half2,
+        "resol": resol,
+        "mask": mask,
+        "resol4refinement": resol4axref,
+        "output_maps": output_maps,
+        "symaverage": symaverage,
+        "axlist": grouped_axlist,
+        "orderlist": orderlist,
+        "fsclist": fsclist,
+        "lowres_cutoff": 10.0,
+        "pg_decide_fsc": 0.9,
+        "user_pg": user_pg,
+        "label": label,
+        "fitfsc": 0.1,
+        "ncycles": 10,
+    }
+    results = main(params)
     return results
-    
+
+
 def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
     """
     This method applys a translaformation (rotation, translation)
@@ -705,13 +851,14 @@ def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
         m1: mapobject from EMDA/iotools.Map
         rotmat: rotation matrix to apply
         trans: translation to apply (Angstroms)
-        ibin: 
+        ibin:
 
     Outputs:
         transformed Fourier coefficients
     """
     if rotmat is not None or trans is not None:
-        if newdim is None: newdim = m1.workarr.shape[0]
+        if newdim is None:
+            newdim = m1.workarr.shape[0]
         if newdim != m1.workarr.shape[0]:
             current_pixsize = m1.workcell[0] / m1.workarr.shape[0]
             newarr = iotools.resample2staticmap(
@@ -720,37 +867,39 @@ def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
                 targt_dim=[newdim, newdim, newdim],
                 arr=m1.workarr,
             )
-            cell = [current_pixsize*newdim for _ in range(3)]
-            for _ in range(3): cell.append(0.)
+            cell = [current_pixsize * newdim for _ in range(3)]
+            for _ in range(3):
+                cell.append(0.0)
             f1 = fftshift(fftn(fftshift(newarr)))
         else:
             cell = m1.workcell
             f1 = fftshift(fftn(fftshift(m1.workarr)))
 
         if rotmat is not None:
-            print('rotamt:')
+            print("rotamt:")
             print(rotmat)
             # check for identity rotation
-            #if((rotmat.shape[0] == rotmat.shape[1]) and 
+            # if((rotmat.shape[0] == rotmat.shape[1]) and
             #    np.allclose(rotmat, np.eye(rotmat.shape[0]))):
-            nbin, res_arr, bin_idx, sgrid = get_binidx(
-                cell=cell, arr=f1)
+            nbin, res_arr, bin_idx, sgrid = get_binidx(cell=cell, arr=f1)
             f1 = np.expand_dims(f1, axis=3)
             nx, ny, nz, ncopies = f1.shape
-            if ibin is None: ibin = nbin
+            if ibin is None:
+                ibin = nbin
             frs = fcodes2.trilinear_sphere(
-                rotmat,f1,bin_idx,0,ibin,ncopies,nx,ny,nz)[:,:,:,0]
+                rotmat, f1, bin_idx, 0, ibin, ncopies, nx, ny, nz
+            )[:, :, :, 0]
             if trans is not None:
-                print('translation: ', trans)
+                print("translation: ", trans)
                 assert len(trans) == 3
-                t = [trans[i]/m1.workcell[i] for i in range(3)]
+                t = [trans[i] / m1.workcell[i] for i in range(3)]
                 st = fcodes2.get_st(nx, ny, nz, t)[0]
                 return st * frs, cell
             else:
                 return frs, cell
         if rotmat is None and trans is not None:
             assert len(trans) == 3
-            t = [trans[i]/m1.workcell[i] for i in range(3)]
+            t = [trans[i] / m1.workcell[i] for i in range(3)]
             st = fcodes2.get_st(nx, ny, nz, t)[0]
             return st * f1, m1.workcell
         # test
@@ -759,26 +908,27 @@ def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
         frs = get_f(f1, ereal_rgi, eimag_rgi, rotmat)
         return frs """
     else:
-        raise SystemExit('No transformation is given!')
+        raise SystemExit("No transformation is given!")
 
 
 def rotate_map_realspace(m1, rotmat=None, threshold=None):
-    print('rotamt:')
+    print("rotamt:")
     print(rotmat)
     if threshold is not None:
         arr = m1.workarr * (m1.workarr > threshold)
     else:
         arr = m1.workarr
     nx, ny, nz = m1.workarr.shape
-    transformed_map = fcodes2.trilinear_map(
-        rotmat, arr, 0, nx, ny, nz)
+    transformed_map = fcodes2.trilinear_map(rotmat, arr, 0, nx, ny, nz)
     return transformed_map
 
 
-def mask_from_halfmaps(h1, h2, emdbid='rhovar'):
+def mask_from_halfmaps(h1, h2, emdbid="rhovar"):
     import emda2.ext.mapmask_using_halfmaps as hfmask
+
     mask = hfmask.main(h1=h1, h2=h2, emdbid=emdbid)
     return [mask]
+
 
 """ def symmetry_average_map(mlist, axlist, folds, rot_centre=None):
     from emda2.ext.sym.average_symcopies import average
@@ -797,8 +947,8 @@ def mask_from_halfmaps(h1, h2, emdbid='rhovar'):
     return f_avg_list """
 
 
-if __name__=="__main__":
-    """ imap = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_trimmed.mrc"
+if __name__ == "__main__":
+    """imap = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_trimmed.mrc"
     mapobj = iotools.Map(name=imap)
     mapobj.read()
     nbin, res_arr, bin_idx = get_binidx(mapobj.cell, mapobj.arr)
@@ -806,8 +956,8 @@ if __name__=="__main__":
                 bin_idx=bin_idx, nbin=nbin)
     print("Resolution   bin     Power")
     for i in range(len(res_arr)):
-        print("{:.2f} {:.4f}".format(res_arr[i], power_spectrum[i]))    
-    exit() """
+        print("{:.2f} {:.4f}".format(res_arr[i], power_spectrum[i]))
+    exit()"""
 
     """ imap1 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_half_map_1_trimmed.mrc"
     imap2 = "/Users/ranganaw/MRC/REFMAC/ligand_challenge/EMD-7770/Trimmed_maps_and_model/emd_7770_half_map_2_trimmed.mrc"
