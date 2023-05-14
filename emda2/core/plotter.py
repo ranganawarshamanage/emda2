@@ -6,7 +6,12 @@ This software is released under the
 Mozilla Public License, version 2.0; see LICENSE.
 """
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals,
+)
 import numpy as np
 import matplotlib
 
@@ -57,43 +62,25 @@ def plot_nlines_log(
             label = "Set#" + str(icurve)
             ax1.plot(bin_arr, np.log10(data), label=label, linewidth=2)
         else:
-            ax1.plot(bin_arr, np.log10(data), label=curve_label[icurve], linewidth=2)
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
+            ax1.plot(
+                bin_arr, np.log10(data), label=curve_label[icurve], linewidth=2
+            )
+    pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
     ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
     ax1.set_xlabel(xlabel)
     plt.ylabel(ylabel)
-    #ax1.set_ylim([-2, 6])
+    # ax1.set_ylim([-2, 6])
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
     plt.legend(loc=0)
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
     if plot_title is not None:
         plt.title(plot_title, fontdict=font)
     plt.savefig(mapname, format="eps", dpi=300)
-    #plt.show()
+    # plt.show()
     plt.close()
-
-
-def plot_line(mapname, res_arr, arr):
-    bin_arr = np.arange(len(res_arr))
-    fig = plt.figure(figsize=(6, 4))
-    ax1 = fig.add_subplot(111)
-    ax1.plot(bin_arr, arr, linewidth=2)
-    xmin = np.min(bin_arr)
-    xmax = np.max(bin_arr)
-    # plt.plot((xmin, xmax), (0.143, 0.143), 'k--')
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
-    n_bins = res_arr.shape[0]
-    pos[pos < 0] = 0
-    pos[pos >= n_bins] = n_bins - 1
-    ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
-    ax1.set_xlabel("Resolution ($\AA$)")
-    plt.ylabel("Fourier Shell Correlation")
-    font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
-    plt.savefig(mapname, format="eps", dpi=300)
-    plt.show()
 
 
 def plot_nlines(
@@ -105,17 +92,17 @@ def plot_nlines(
     plot_title=None,
     **kwargs
 ):
-
-    if 'linecolor' in kwargs: linecolors = kwargs['linecolor']
-    if 'verticleline' in kwargs: 
-        vl = kwargs['verticleline']
+    if "linecolor" in kwargs:
+        linecolors = kwargs["linecolor"]
+    if "verticleline" in kwargs:
+        vl = kwargs["verticleline"]
     else:
         vl = None
     multicolor = False
-    if 'multicolor' in kwargs:
+    if "multicolor" in kwargs:
         multicolor = True
     if curve_label is None:
-        curve_label = ['series%s'%(i+1) for i in range(len(list_arr))]
+        curve_label = ["series%s" % (i + 1) for i in range(len(list_arr))]
     bin_arr = np.arange(len(res_arr))
     fig = plt.figure(figsize=(6, 4))
     ax1 = fig.add_subplot(111)
@@ -124,82 +111,86 @@ def plot_nlines(
         try:
             for icurve in range(len(list_arr)):
                 ax1.plot(
-                    bin_arr[:int(vl)+1], 
-                    list_arr[icurve][:int(vl)+1], 
+                    bin_arr[: int(vl) + 1],
+                    list_arr[icurve][: int(vl) + 1],
                     label=curve_label[icurve],
-                    color=linecolors[icurve], 
+                    color=linecolors[icurve],
                     linewidth=2,
-                    )  
-        except:  
+                )
+        except:
             for icurve in range(len(list_arr)):
                 ax1.plot(
-                    bin_arr[:int(vl)+1], 
-                    list_arr[icurve][:int(vl)+1], 
-                    label=curve_label[icurve], 
+                    bin_arr[: int(vl) + 1],
+                    list_arr[icurve][: int(vl) + 1],
+                    label=curve_label[icurve],
                     linewidth=2,
-                    ) 
+                )
         try:
             for icurve in range(len(list_arr)):
                 ax1.plot(
-                    bin_arr, 
-                    list_arr[icurve], 
-                    label='_'+curve_label[icurve], # YES, this "_" hides the label
-                    color=linecolors[icurve], 
+                    bin_arr,
+                    list_arr[icurve],
+                    label="_"
+                    + curve_label[icurve],  # YES, this "_" hides the label
+                    color=linecolors[icurve],
                     linewidth=2,
-                    alpha=0.3
-                    )  
-        except:  
+                    alpha=0.3,
+                )
+        except:
             for icurve in range(len(list_arr)):
                 ax1.plot(
-                    bin_arr, 
-                    list_arr[icurve], 
-                    label='_'+curve_label[icurve], 
+                    bin_arr,
+                    list_arr[icurve],
+                    label="_" + curve_label[icurve],
                     linewidth=2,
-                    alpha=0.3
-                    )
+                    alpha=0.3,
+                )
     else:
         # single color plots
         try:
             for icurve in range(len(list_arr)):
                 ax1.plot(
-                    bin_arr, 
-                    list_arr[icurve], 
+                    bin_arr,
+                    list_arr[icurve],
                     label=curve_label[icurve],
-                    color=linecolors[icurve], 
+                    color=linecolors[icurve],
                     linewidth=2,
-                    )  
-        except:  
+                )
+        except:
             for icurve in range(len(list_arr)):
                 ax1.plot(
-                    bin_arr, 
-                    list_arr[icurve], 
-                    label=curve_label[icurve], 
+                    bin_arr,
+                    list_arr[icurve],
+                    label=curve_label[icurve],
                     linewidth=2,
-                    )         
+                )
     xmin, xmax = np.min(bin_arr), np.max(bin_arr)
     plt.plot(
-        (xmin, xmax), 
-        (float(fscline), float(fscline)), 
-        color="gray", linestyle=":", linewidth=1
-        )
+        (xmin, xmax),
+        (float(fscline), float(fscline)),
+        color="gray",
+        linestyle=":",
+        linewidth=1,
+    )
     plt.plot(
-        (xmin, xmax), 
-        (0.0, 0.0), 
-        color="black", linestyle=":", linewidth=1
-        )
+        (xmin, xmax), (0.0, 0.0), color="black", linestyle=":", linewidth=1
+    )
     if vl is not None:
         plt.plot(
-            (int(vl), int(vl)), 
-            (0.0, 1.0), 
-            color="black", linestyle="solid", linewidth=0.5
-            )       
+            (int(vl), int(vl)),
+            (0.0, 1.0),
+            color="black",
+            linestyle="solid",
+            linewidth=0.5,
+        )
     pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
     #
     import matplotlib.ticker as mticker
-    label_format = '{:5.2f}'
+
+    label_format = "{:5.2f}"
     ax1.xaxis.set_major_locator(mticker.FixedLocator(pos))
     ax1.set_xticklabels([label_format.format(res_arr[x]) for x in pos])
     ax1.set_xlabel("Resolution ($\AA$)")
@@ -208,39 +199,9 @@ def plot_nlines(
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 10}
     if plot_title is not None:
         plt.title(plot_title, fontdict=font)
-    #plt.savefig(mapname+'.eps', format="eps", dpi=300)
-    plt.savefig(mapname+'.pdf', format="pdf", dpi=300)
+    # plt.savefig(mapname+'.eps', format="eps", dpi=300)
+    plt.savefig(mapname + ".pdf", format="pdf", dpi=300)
     plt.close()
-
-
-def plot_nlines2(
-    res_arr, list_arr, mapname="halfmap_fsc.eps", curve_label=None
-):
-    # from mpl_toolkits.axes_grid1 import host_subplot
-    # import mpl_toolkits.axisartist as AA
-
-    if curve_label is None:
-        curve_label = ["halfmap_fsc"]
-    bin_arr = np.arange(len(res_arr))
-    fig = plt.figure(figsize=(6, 4))
-    # ax1 = host_subplot(111,axes_class=AA.Axes)
-    ax1 = fig.add_subplot(111)
-    for icurve in range(len(list_arr)):
-        ax1.plot(bin_arr, list_arr[icurve], label=curve_label[icurve], linewidth=2)
-    xmin = np.min(bin_arr)
-    xmax = np.max(bin_arr)
-    plt.plot((xmin, xmax), (0.5, 0.5), "k--")
-
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
-    n_bins = res_arr.shape[0]
-    pos[pos < 0] = 0
-    pos[pos >= n_bins] = n_bins - 1
-    ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
-    ax1.set_xlabel("Resolution (1/$\AA$)")
-    plt.legend(loc=0)
-    plt.ylabel("Fourier Shell Correlation")
-    font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
-    plt.savefig(mapname, format="eps", dpi=300)
 
 
 def plot_3d(data):
@@ -314,14 +275,24 @@ def contour_nplot(nx, ny, lst_data):
         plt.subplot(1, n, i)
         if i == 3:
             img1 = plt.contourf(
-                X, Y, imap, 200, cmap="RdGy", levels=np.linspace(min_val, max_val, 20)
+                X,
+                Y,
+                imap,
+                200,
+                cmap="RdGy",
+                levels=np.linspace(min_val, max_val, 20),
             )
             divider = make_axes_locatable(ax3)
             cax1 = divider.append_axes("right", size="5%", pad=0.05)
             fig.colorbar(img1, cax=cax1)
         else:
             plt.contourf(
-                X, Y, imap, 200, cmap="RdGy", levels=np.linspace(min_val, max_val, 20)
+                X,
+                Y,
+                imap,
+                200,
+                cmap="RdGy",
+                levels=np.linspace(min_val, max_val, 20),
             )
     plt.show()
 
@@ -375,12 +346,12 @@ def plot_from_twofiles_csv(filename, labels):
     plt.show()
 
 
-def plot_fval(fval_list,i=0):
+def plot_fval(fval_list, i=0):
     fig = plt.figure(figsize=(6, 4))
     ax1 = fig.add_subplot(111)
     ax1.plot(fval_list, label="fval", linewidth=2)
     plt.legend(loc=0)
     plt.ylabel("functional value")
-    outname = "fval_mcycle_%i" %i
-    plt.savefig(outname+".eps", format="eps", dpi=300)
-    plt.show()    
+    outname = "fval_mcycle_%i" % i
+    plt.savefig(outname + ".eps", format="eps", dpi=300)
+    plt.show()
