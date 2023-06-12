@@ -778,6 +778,7 @@ def get_pointgroup(
     fsclist=None,
     user_pg=None,
     label=None,
+    pmap=None,
 ):
     """
     Determines the point group of the map
@@ -812,7 +813,7 @@ def get_pointgroup(
     Outputs:
         Dictionary with all the meta data
     """
-    from emda2.ext.sym.symanalysis_pipeline import main
+    from emda2.ext.sym.symanalysis_pipeline import switch
 
     if axlist is not None:
         assert len(axlist) // 3 == len(orderlist)
@@ -823,6 +824,7 @@ def get_pointgroup(
     params = {
         "half1": half1,
         "half2": half2,
+        "pmap": pmap,
         "resol": resol,
         "mask": mask,
         "resol4refinement": resol4axref,
@@ -838,7 +840,7 @@ def get_pointgroup(
         "fitfsc": 0.1,
         "ncycles": 10,
     }
-    results = main(params)
+    results = switch(params)
     return results
 
 
