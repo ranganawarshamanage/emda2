@@ -2,40 +2,40 @@
 import numpy as np
 import emda2.emda_methods2 as em
 import fcodes2
-from emda2.core import fsctools
+
+# from emda2.core import fsctools
 from emda2.ext.overlay import get_avg_fsc
 from emda2.ext.utils import set_array
-from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum
-from emda.core import quaternions
+from emda2.core import quaternions
 from timeit import default_timer as timer
 import fcodes2
+from emda2.ext.utils import (
+    get_avg_fsc,
+    # determine_ibin,
+    # rotate_f_within_sphere,
+    get_xyz_sum,
+    cut_resolution_for_linefit,
+)
+from emda2.ext.bfgs import create_xyz_grid
+from emda2.ext.utils import cut_resolution_for_linefit
+from scipy.optimize import minimize_scalar
 
+# from emda2.ext.bfgs import get_rgi, get_f
 
 timeit = False
 debug_mode = 0
 
 
 def calc_fsc(f1, f2, bin_idx, nbin):
-    from emda.core.fsc import anytwomaps_fsc_covariance
     nx, ny, nz = f1.shape
-    f1f2_covar, binfsc, bincounts = fcodes2.calc_covar_and_fsc_betwn_anytwomaps(
+    (
+        f1f2_covar,
+        binfsc,
+        bincounts,
+    ) = fcodes2.calc_covar_and_fsc_betwn_anytwomaps(
         f1, f2, bin_idx, nbin, debug_mode, nx, ny, nz
     )
-    # test 26/7/2022
-    #for i, ifsc in enumerate(binfsc):
-    #    print(i, ifsc, bincounts[i])
-    #
-    """ results = anytwomaps_fsc_covariance(
-        f1=f1, 
-        f2=f2, 
-        bin_idx=bin_idx, 
-        nbin=nbin
-        ) """
-    #binfsc = results[0]
-    #bincounts = results[2]
-    # return average fsc as well
-    fsc_avg = get_avg_fsc(binfsc=binfsc,
-        bincounts=bincounts)
+    fsc_avg = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
     return [binfsc, fsc_avg]
 
 
@@ -48,21 +48,20 @@ def get_dfs(mapin, xyz, vol):
         )
     return dfs
 
-def derivatives_rotation(e0, e1, wgrid, sv, q, xyz, xyz_sum):
-    from emda.core.quaternions import derivatives_wrt_q
-    from emda2.ext.bfgs import get_dfs2
 
+def derivatives_rotation(e0, e1, wgrid, sv, q, xyz, xyz_sum):
     # rotation derivatives
     tp2 = (2.0 * np.pi) ** 2
     nx, ny, nz = e0.shape
     vol = nx * ny * nz
     dFRS = get_dfs(np.real(np.fft.ifftn(np.fft.ifftshift(e1))), xyz, vol)
-    #dFRS = get_dfs2(e1, xyz)
-    #temp = np.gradient(e1) # numerical derivative
-    #dFRS = np.zeros((nx, ny, nz, 3), 'complex')
-    #for i in range(3):
+    # dFRS = get_dfs2(e1, xyz)
+    # temp = np.gradient(e1) # numerical derivative
+    # dFRS = np.zeros((nx, ny, nz, 3), 'complex')
+    # for i in range(3):
     #    dFRS[:,:,:,i] = temp[i]
-    dRdq = derivatives_wrt_q(q)
+    # dRdq = derivatives_wrt_q(q)
+    dRdq = quaternions.derivatives_wrt_q(q)
     df = np.zeros(3, dtype="float")
     ddf = np.zeros((3, 3), dtype="float")
     for i in range(3):
@@ -74,7 +73,11 @@ def derivatives_rotation(e0, e1, wgrid, sv, q, xyz, xyz_sum):
                         wgrid
                         * np.real(
                             np.conjugate(e0)
-                            * (dFRS[:, :, :, k] * sv[l, :, :, :] * dRdq[i, k, l])
+                            * (
+                                dFRS[:, :, :, k]
+                                * sv[l, :, :, :]
+                                * dRdq[i, k, l]
+                            )
                         )
                     )
                 else:
@@ -110,25 +113,30 @@ def derivatives_rotation(e0, e1, wgrid, sv, q, xyz, xyz_sum):
     step = ddf_inv.dot(-df)
     return step
 
+
 def derivatives_translation(e0, e1, wgrid, w2grid, sv):
     PI = np.pi
-    tp2 = (2.0 * PI)**2
-    tpi = (2.0 * PI * 1j)
+    tp2 = (2.0 * PI) ** 2
+    tpi = 2.0 * PI * 1j
     start = timer()
     # translation derivatives
-    df = np.zeros(3, dtype='float')
-    ddf = np.zeros((3,3), dtype='float')
+    df = np.zeros(3, dtype="float")
+    ddf = np.zeros((3, 3), dtype="float")
     for i in range(3):
-        df[i] = np.real(np.sum(wgrid * e0 * np.conjugate(e1 * tpi * sv[i,:,:,:]))) 
+        df[i] = np.real(
+            np.sum(wgrid * e0 * np.conjugate(e1 * tpi * sv[i, :, :, :]))
+        )
         for j in range(3):
-            if(i==0 or (i>0 and j>=i)):
-                ddf[i,j] = -tp2 * np.sum(wgrid * sv[i,:,:,:] * sv[j,:,:,:]) 
+            if i == 0 or (i > 0 and j >= i):
+                ddf[i, j] = -tp2 * np.sum(
+                    wgrid * sv[i, :, :, :] * sv[j, :, :, :]
+                )
             else:
-                ddf[i,j] = ddf[j,i]
+                ddf[i, j] = ddf[j, i]
     ddf_inv = np.linalg.pinv(ddf)
     step = ddf_inv.dot(-df)
     end = timer()
-    #print("time for trans deriv. ", end-start)
+    # print("time for trans deriv. ", end-start)
     return step
 
 
@@ -165,71 +173,76 @@ class Optimiser:
         self.le1 = None
         self.lbinindx = None
         self.lnbin = None
-        self.finalrun = False # test option
+        self.finalrun = False  # test option
         self.comshift = None
 
     def calc_fsc(self):
         nx, ny, nz = self.e0.shape
-        f1f2_covar, binfsc, bincounts = fcodes2.calc_covar_and_fsc_betwn_anytwomaps(
-            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin, debug_mode, nx, ny, nz
+        (
+            f1f2_covar,
+            binfsc,
+            bincounts,
+        ) = fcodes2.calc_covar_and_fsc_betwn_anytwomaps(
+            self.e0,
+            self.ert,
+            self.mapobj.cbin_idx,
+            self.mapobj.cbin,
+            debug_mode,
+            nx,
+            ny,
+            nz,
         )
-        #print('bin-FSC:')
-        #print(binfsc)
-        """ from emda.core.fsc import anytwomaps_fsc_covariance
-        results = anytwomaps_fsc_covariance(
-            f1=self.e0, 
-            f2=self.e1, 
-            bin_idx=self.mapobj.cbin_idx, 
-            nbin=self.mapobj.cbin
-            )
-        binfsc = results[0]
-        bincounts = results[2] """
         # return average fsc as well
         from emda2.ext.overlay import get_avg_fsc
+
         fsc_avg = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
         return [binfsc, fsc_avg]
 
-    def get_wght(self): 
+    def get_wght(self):
         cx, cy, cz = self.e0.shape
-        val_arr = np.zeros((self.mapobj.cbin, 2), dtype='float')
+        val_arr = np.zeros((self.mapobj.cbin, 2), dtype="float")
         binfsc = set_array(arr=self.fsc, thresh=0.0)
-        w1 = binfsc / (1 - binfsc ** 2)
+        w1 = binfsc / (1 - binfsc**2)
         w2 = w1**2
-        val_arr[:,0] = self.fsc #/ (1 - self.fsc ** 2)
-        fsc_sqd = self.fsc ** 2
-        fsc_combi = fsc_sqd #/ (1 - fsc_sqd)
-        val_arr[:,1] = fsc_combi
-        #val_arr[:,0] = w1
-        #val_arr[:,1] = w2
-        wgrid = fcodes2.read_into_grid2(self.mapobj.cbin_idx,val_arr, self.mapobj.cbin, cx, cy, cz)
-        return wgrid[:,:,:,0], wgrid[:,:,:,1]
+        val_arr[:, 0] = self.fsc  # / (1 - self.fsc ** 2)
+        fsc_sqd = self.fsc**2
+        fsc_combi = fsc_sqd  # / (1 - fsc_sqd)
+        val_arr[:, 1] = fsc_combi
+        # val_arr[:,0] = w1
+        # val_arr[:,1] = w2
+        wgrid = fcodes2.read_into_grid2(
+            self.mapobj.cbin_idx, val_arr, self.mapobj.cbin, cx, cy, cz
+        )
+        return wgrid[:, :, :, 0], wgrid[:, :, :, 1]
 
     def functional(self):
         fval = np.sum(self.w_grid * self.e0 * np.conjugate(self.ert))
         return fval.real
 
     def optimizer(
-        self, 
-        ncycles, 
-        t, 
-        rotmat, 
-        ifit, 
-        smax_lf, 
-        t_only=False, 
-        r_only=False, 
-        fobj=None, 
-        q_init=None
-        ):
+        self,
+        ncycles,
+        t,
+        rotmat,
+        ifit,
+        smax_lf,
+        t_only=False,
+        r_only=False,
+        fobj=None,
+        q_init=None,
+    ):
         rotation = translation = True
-        if t_only: rotation = False
-        if r_only: translation = False
+        if t_only:
+            rotation = False
+        if r_only:
+            translation = False
         tol = 1e-2
         fsc_lst = []
         fval_list = []
         self.e0 = self.mapobj.ceo_lst[0]  # Static map e-data for fit
-        xyz = create_xyz_grid(self.cell, self.cut_dim)
+        xyz = create_xyz_grid(self.cut_dim)
         xyz_sum = get_xyz_sum(xyz)
-        t_init = np.asarray(t)
+        #t_init = np.asarray(t)
         if q_init is None:
             q_init = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
         else:
@@ -254,28 +267,32 @@ class Optimiser:
                 if rotation and not translation:
                     # rotation only
                     self.rotmat = quaternions.get_RM(self.q)
-                    maps2send = np.stack((self.e1, self.cfo), axis = -1)
+                    maps2send = np.stack((self.e1, self.cfo), axis=-1)
                     bin_idx = self.mapobj.cbin_idx
                     nbin = self.mapobj.cbin
-                    #maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)  
-                    maps = fcodes2.trilinear_sphere(self.rotmat,maps2send,bin_idx,0,nbin,2,cx,cy,cz)      
+                    # maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)
+                    maps = fcodes2.trilinear_sphere(
+                        self.rotmat, maps2send, bin_idx, 0, nbin, 2, cx, cy, cz
+                    )
                     self.ert = maps[:, :, :, 0]
                     self.crt = maps[:, :, :, 1]
                 elif translation and not rotation:
                     # translation only
                     self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
-                    self.sv = np.array([s1, s2, s3]) 
+                    self.sv = np.array([s1, s2, s3])
                     self.ert = self.e1 * self.st
-                    self.crt = self.cfo * self.st 
+                    self.crt = self.cfo * self.st
                 else:
                     # both rotation and translation need to refine
                     # first rotate
                     self.rotmat = quaternions.get_RM(self.q)
-                    maps2send = np.stack((self.e1, self.cfo), axis = -1)
+                    maps2send = np.stack((self.e1, self.cfo), axis=-1)
                     bin_idx = self.mapobj.cbin_idx
                     nbin = self.mapobj.cbin
-                    #maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz) 
-                    maps = fcodes2.trilinear_sphere(self.rotmat,maps2send,bin_idx,0,nbin,2,cx,cy,cz)       
+                    # maps = fcodes2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)
+                    maps = fcodes2.trilinear_sphere(
+                        self.rotmat, maps2send, bin_idx, 0, nbin, 2, cx, cy, cz
+                    )
                     # then translate
                     self.st, s1, s2, s3 = fcodes2.get_st(cx, cy, cz, self.t)
                     self.sv = np.array([s1, s2, s3])
@@ -289,30 +306,58 @@ class Optimiser:
             # current rotation and translation to print
             q = quaternions.quaternion_multiply(self.q, q0)
             q = q / np.sqrt(np.dot(q, q))
-            theta2 = np.arccos((np.trace(quaternions.get_RM(q)) - 1) / 2) * 180.0 / np.pi
-            t_accum_angstrom = (t + self.t) * self.pixsize * self.mapobj.map_dim[0]
+            theta2 = (
+                np.arccos((np.trace(quaternions.get_RM(q)) - 1) / 2)
+                * 180.0
+                / np.pi
+            )
+            t_accum_angstrom = (
+                (t + self.t) * self.pixsize * self.mapobj.map_dim[0]
+            )
             if self.comshift is not None:
                 t_accum_angstrom += self.comshift
-            translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
+            translation_vec = np.sqrt(
+                np.dot(t_accum_angstrom, t_accum_angstrom)
+            )
             # check for convergence
             if rotation and not translation:
                 if i > 2:
-                    if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
+                    if (
+                        abs(fval_list[-3] - fval_list[-2]) < tol
+                        and abs(fval_list[-2] - fval_list[-1]) < tol
+                    ):
                         break
             elif translation and not rotation:
                 if i > 2:
-                    if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
+                    if (
+                        abs(fval_list[-3] - fval_list[-2]) < tol
+                        and abs(fval_list[-2] - fval_list[-1]) < tol
+                    ):
                         break
             else:
                 if i > 5:
-                    if abs(fval_list[-3] - fval_list[-2]) < tol and abs(fval_list[-2] - fval_list[-1]) < tol:
+                    if (
+                        abs(fval_list[-3] - fval_list[-2]) < tol
+                        and abs(fval_list[-2] - fval_list[-1]) < tol
+                    ):
                         break
             if rotation and not translation:
                 self.step = derivatives_rotation(
-                    self.e0, self.ert, self.w_grid, self.sv, self.q, xyz, xyz_sum)
-                lft = lft = linefit()#ndlinefit()
+                    self.e0,
+                    self.ert,
+                    self.w_grid,
+                    self.sv,
+                    self.q,
+                    xyz,
+                    xyz_sum,
+                )
+                lft = lft = linefit()  # ndlinefit()
                 lft.get_linefit_static_data(
-                    [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                    [self.e0, self.ert],
+                    self.mapobj.cbin_idx,
+                    self.mapobj.res_arr,
+                    smax_lf,
+                )
                 lft.step = self.step
                 alpha_r = lft.scalar_opt()
                 self.q += np.insert(self.step * alpha_r, 0, 0.0)
@@ -320,35 +365,56 @@ class Optimiser:
             elif translation and not rotation:
                 # translation optimisation
                 self.step = derivatives_translation(
-                    self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
+                    self.e0, self.ert, self.w_grid, self.w2_grid, self.sv
+                )
                 lft = linefit()
                 lft.get_linefit_static_data(
-                    [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                    [self.e0, self.ert],
+                    self.mapobj.cbin_idx,
+                    self.mapobj.res_arr,
+                    smax_lf,
+                )
                 lft.step = self.step
                 alpha_t = lft.scalar_opt_trans()
                 self.t += self.step * alpha_t
-            else:                                        
+            else:
                 if i % 2 == 0:
                     self.step = derivatives_rotation(
-                        self.e0, self.ert, self.w_grid, self.sv, self.q, xyz, xyz_sum)
-                    lft = linefit() #ndlinefit()
+                        self.e0,
+                        self.ert,
+                        self.w_grid,
+                        self.sv,
+                        self.q,
+                        xyz,
+                        xyz_sum,
+                    )
+                    lft = linefit()  # ndlinefit()
                     lft.get_linefit_static_data(
-                        [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                        [self.e0, self.ert],
+                        self.mapobj.cbin_idx,
+                        self.mapobj.res_arr,
+                        smax_lf,
+                    )
                     lft.step = self.step
                     alpha_r = lft.scalar_opt()
-                    print('q-step, alpha_r ', self.step, alpha_r)
+                    print("q-step, alpha_r ", self.step, alpha_r)
                     self.q += np.insert(self.step * alpha_r, 0, 0.0)
                     self.q = self.q / np.sqrt(np.dot(self.q, self.q))
                 else:
                     # translation optimisation
                     self.step = derivatives_translation(
-                        self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
+                        self.e0, self.ert, self.w_grid, self.w2_grid, self.sv
+                    )
                     lft = linefit()
                     lft.get_linefit_static_data(
-                        [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                        [self.e0, self.ert],
+                        self.mapobj.cbin_idx,
+                        self.mapobj.res_arr,
+                        smax_lf,
+                    )
                     lft.step = self.step
                     alpha_t = lft.scalar_opt_trans()
-                    print('t-step, alpha_t ', self.step, alpha_t)
+                    print("t-step, alpha_t ", self.step, alpha_t)
                     self.t += self.step * alpha_t
             print(
                 "{:5d} {:8.4f} {:6.4f} {:6.4f} {:8.7f}".format(
@@ -360,10 +426,6 @@ class Optimiser:
                 print("time for one cycle:", end - start)
 
 
-
-from emda.ext.utils import cut_resolution_for_linefit
-from scipy.optimize import minimize_scalar
-from emda2.ext.bfgs import get_rgi, get_f
 class linefit:
     def __init__(self):
         self.e0 = None
@@ -377,16 +439,18 @@ class linefit:
 
     def get_linefit_static_data(self, e_list, bin_idx, res_arr, smax):
         if len(e_list) == 2:
-            eout, self.bin_idx, self.nbin = cut_resolution_for_linefit(e_list, bin_idx, res_arr, smax)
+            eout, self.bin_idx, self.nbin = cut_resolution_for_linefit(
+                e_list, bin_idx, res_arr, smax
+            )
         else:
             print("len(e_list): ", len(e_list))
             raise SystemExit()
-        self.e0 = eout[0,:,:,:]
-        self.e1 = eout[1,:,:,:]
+        self.e0 = eout[0, :, :, :]
+        self.e1 = eout[1, :, :, :]
 
     def get_fsc_wght(self, e0, ert, bin_idx, nbin):
         cx, cy, cz = e0.shape
-        #print('TRANSLATION')
+        # print('TRANSLATION')
         fsc = calc_fsc(e0, ert, bin_idx, nbin)[0]
         w_grid = fcodes2.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
         return w_grid
@@ -394,19 +458,23 @@ class linefit:
     def func(self, i):
         nx, ny, nz = self.e0.shape
         tmp = np.insert(self.step * i, 0, 0.0)
-        q = tmp + self.q_init#self.q_prev
+        q = tmp + self.q_init  # self.q_prev
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
         ers = get_FRS(rotmat, self.e1, interp="linear")
-        w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)   
-        fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0])))
-        #ers = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)
-        #w_grid = self.get_fsc_wght(self.e0, ers, self.bin_idx, self.nbin)   
-        #fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers)))
-        return -fval/(0.5 * nx * ny * nz)
+        w_grid = self.get_fsc_wght(
+            self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin
+        )
+        fval = np.real(
+            np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0]))
+        )
+        # ers = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)
+        # w_grid = self.get_fsc_wght(self.e0, ers, self.bin_idx, self.nbin)
+        # fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers)))
+        return -fval / (0.5 * nx * ny * nz)
 
     def scalar_opt(self, t=None):
-        #self.ereal_rgi, self.eimag_rgi = get_rgi(self.e1)
+        # self.ereal_rgi, self.eimag_rgi = get_rgi(self.e1)
         f = self.func
         res = minimize_scalar(f, method="brent", tol=1e-5)
         return res.x
@@ -418,7 +486,7 @@ class linefit:
         e1_t = self.e1 * st
         w_grid = self.get_fsc_wght(self.e0, e1_t, self.bin_idx, self.nbin)
         fval = np.sum(w_grid * self.e0 * np.conjugate(e1_t))
-        return -fval.real/(0.5 * nx * ny * nz)
+        return -fval.real / (0.5 * nx * ny * nz)
 
     def scalar_opt_trans(self):
         start = timer()
@@ -441,39 +509,47 @@ class ndlinefit:
 
     def get_linefit_static_data(self, e_list, bin_idx, res_arr, smax):
         if len(e_list) == 2:
-            eout, self.bin_idx, self.nbin = cut_resolution_for_linefit(e_list, bin_idx, res_arr, smax)
+            eout, self.bin_idx, self.nbin = cut_resolution_for_linefit(
+                e_list, bin_idx, res_arr, smax
+            )
         else:
             print("len(e_list: ", len(e_list))
             raise SystemExit()
-        self.e0 = eout[0,:,:,:]
-        self.e1 = eout[1,:,:,:]
+        self.e0 = eout[0, :, :, :]
+        self.e1 = eout[1, :, :, :]
 
     def get_fsc_wght(self, e0, ert, bin_idx, nbin):
         cx, cy, cz = e0.shape
         """ bin_stats = core.fsc.anytwomaps_fsc_covariance(e0, ert, bin_idx, nbin)
         fsc, _ = bin_stats[0], bin_stats[1] """
-        #print('ROTATION')
+        # print('ROTATION')
         fsc = calc_fsc(e0, ert, bin_idx, nbin)[0]
         w_grid = fcodes2.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
         return w_grid
 
     def func(self, init_guess):
         from emda.ext.mapfit import utils as maputils
-        tmp = np.insert(np.asarray(self.step, 'float') * np.asarray(init_guess,'float'), 0, 0.0)
-        #tmp = np.insert(self.step * i, 0, 0.0)
-        #q = tmp + self.q_prev
+
+        tmp = np.insert(
+            np.asarray(self.step, "float") * np.asarray(init_guess, "float"),
+            0,
+            0.0,
+        )
+        # tmp = np.insert(self.step * i, 0, 0.0)
+        # q = tmp + self.q_prev
         q = tmp + self.q_init
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
         ers = maputils.get_FRS(rotmat, self.e1, interp="linear")
-        #w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)   
-        #fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0])))
+        # w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)
+        # fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0])))
         fval = np.real(np.sum(self.e0 * np.conjugate(ers[:, :, :, 0])))
         return -fval
 
     def scalar_opt(self, t=None):
         import scipy.optimize as optimize
+
         f = self.func
-        init_guess = np.array([1.0, 1.0, 1.0], dtype='float')
+        init_guess = np.array([1.0, 1.0, 1.0], dtype="float")
         res = optimize.minimize(f, init_guess, method="Powell")
-        return np.asarray(res.x, 'float')
+        return np.asarray(res.x, "float")
