@@ -586,7 +586,7 @@ def get_pg_perlevel(a, axes, folds, level):
 
 def main(dict, fobj=None):
     # check if halfmaps are present
-    if not (os.path.isfile(dict["half1"]) and (os.path.isfile(dict["half1"]))):
+    if not (os.path.isfile(dict["half1"])):
         raise SystemExit("Half maps are missing!")
 
     # make a label
@@ -695,6 +695,18 @@ def main(dict, fobj=None):
             )
             fobj.write(strng)
     return dict
+
+
+def switch(dict):
+    print(dict)
+    if (os.path.isfile(dict["half1"])):
+        return main(dict, fobj=None)
+    if (os.path.isfile(dict["pmap"])):
+        from emda2.ext.sym import symanalysis_primarymap
+        return symanalysis_primarymap.main(dict, fobj=None)
+    else:
+        print("Maps are missing!")
+        return None
 
 
 def getlist(fname="ids.txt", search_key="EMD-(.+)"):
