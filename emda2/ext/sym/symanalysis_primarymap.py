@@ -530,7 +530,7 @@ def my_func(emdbid):
                     logfile.close()
                     print("Structure %s done!" % emdbid)
 
-            if final_results["maskname"] is not None:
+            if final_results["mask"] is not None:
                 os.remove(final_results["maskname"])
 
             if final_results["reboxedmapname"] is not None:
