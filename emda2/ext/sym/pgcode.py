@@ -741,8 +741,9 @@ def check_for_cyclic_only(emmap1, axes, orders, fscs, fobj):
                 pg = "C%s" % mainax_bestorder
         return pg
     # more than one axis
-    for axis in saxes[1:]:
+    for i, axis in enumerate(saxes[1:]):
         angle = cosine_angle(saxes[0], axis)
+        print("Angle between Ax0 and Ax%i is %f" % (i + 1, angle))
         if angle <= ang_tol_p or (180.0 - angle) <= ang_tol_p:
             mask.append(True)
         else:
@@ -776,7 +777,42 @@ def check_for_cyclic_only(emmap1, axes, orders, fscs, fobj):
                 )
                 pg = "C%s" % mainax_bestorder
             else:
-                pg = None
+                ll = []
+                for order in sorders[1:]:
+                    binfsc_refax, _, _ = calc_fsc(
+                        emmap1=emmap1,
+                        axis=refined_main_axis,
+                        angle=float(360 / order),
+                        t=t_centroid,
+                    )
+                    fsc_refined_ax1 = binfsc_refax[
+                        emmap1.claimed_bin
+                    ]  # refined FSC @ claimed resol.
+                    ll.append(fsc_refined_ax1)
+                    emmap1.symdat.append(
+                        [
+                            [order],
+                            refined_main_axis,
+                            list(binfsc_refax),
+                            t_centroid,
+                        ]
+                    )
+                reduced_list = [
+                    sorders[i + 1]
+                    for i, ifsc in enumerate(ll)
+                    if ifsc > pg_decide_fsc
+                ]
+                if len(reduced_list) > 0:
+                    mainax_bestorder, _ = get_axorder(
+                        emmap1=emmap1,
+                        refined_axis=refined_main_axis,
+                        order_list=reduced_list,
+                        fobj=fobj,
+                        t=t_centroid,
+                    )
+                    pg = "C%s" % mainax_bestorder
+                else:
+                    pg = "C1"
         else:
             pg = None
     else:
