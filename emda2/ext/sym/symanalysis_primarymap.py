@@ -472,7 +472,7 @@ def main(dict, fobj=None):
             dict["emda_pg"] = "C1"
             dict["proshade_pg"] = "C1"
             strng = "Point group [Proshade, EMDA]: {} {}\n".format(
-                proshade_pg, emda_pg
+                dict["proshade_pg"], dict["emda_pg"]
             )
             fobj.write(strng)
     return dict
