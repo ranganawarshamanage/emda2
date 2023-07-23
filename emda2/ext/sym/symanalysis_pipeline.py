@@ -193,6 +193,7 @@ def test(emmap1, axes, orders, fscs, fobj=None):
     )
     emdalogger.log_string(fobj, s)
 
+    print('Checking for cyclic orders...')
     pg = pgcode.check_for_cyclic_only(
         emmap1=emmap1,
         axes=prime_axlist,
@@ -202,7 +203,7 @@ def test(emmap1, axes, orders, fscs, fobj=None):
     )
     if pg is not None:
         return pg
-
+    print("More than one axis.")
     pg = "C1"
     if len(sorder5ax) > 0:
         axes = [sorder5ax, sorder3ax, sorder2ax, sordernax]
