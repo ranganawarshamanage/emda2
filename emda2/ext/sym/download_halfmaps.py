@@ -167,6 +167,8 @@ def fetch_primarymap(emdid):
             return [name_list, claimed_resol, pointg, maskname]
         except Exception as e:
             raise e
+    else:
+        return []
 
 
 if __name__=="__main__":
