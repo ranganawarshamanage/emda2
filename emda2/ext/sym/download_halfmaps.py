@@ -100,6 +100,75 @@ def fetch_halfmaps(emdid):
             raise e
 
 
+def fetch_primarymap(emdid):
+    name_list = []
+    localdb = "/cephfs/ranganaw/EMDB/"
+    xmlfile1 = "EMD-%s/header/emd-%s.xml" % (emdid, emdid)
+    tree1 = ET.parse(localdb + xmlfile1)
+    root1 = tree1.getroot()
+    root = root1
+    path = "./"
+    maskid = None
+    mapid = None
+    claimed_resol = None
+    pointg = None
+
+    for structure_determination_list in root.findall("structure_determination_list"):
+        for structure_determination in structure_determination_list.findall("structure_determination"):
+            for singleparticle_processing in structure_determination.findall("singleparticle_processing"):
+                for final_reconstruction in singleparticle_processing.findall("final_reconstruction"):
+                    for resolution in final_reconstruction.findall("resolution"):
+                        claimed_resol = resolution.text
+                    for symmetry in final_reconstruction.findall("applied_symmetry"):
+                        for pointgroup in symmetry.findall("point_group"):
+                            pointg = pointgroup.text
+
+    for interpretation in root.findall("interpretation"):
+        for segmentation_list in interpretation.findall("segmentation_list"):
+            for segmentation in segmentation_list.findall("segmentation"):
+                for file in segmentation.findall("file"):
+                    maskid = file.text
+
+    for map in root.findall("map"):
+        for file in map.findall("file"):
+            mapid = file.text
+
+    print("claimed resol ", claimed_resol)
+    print("Mask Id: ", maskid)
+    print("Map ID: ", mapid)
+
+    # check if mask file presents
+    maskname = "emd_%s_msk_1.map"%(emdid)
+    maskpath = localdb+"EMD-%s/masks/emd_%s_msk_1.map"%(emdid, emdid)
+    ismask = os.path.isfile(maskpath)
+
+    if claimed_resol is None or float(claimed_resol) >= 10.0:
+        return []
+    if pointg is None:
+        return []
+    if ismask:
+        readname_list = []
+        writename_list = []
+        if mapid is not None:
+            # copy mask here
+            shutil.copy2(maskpath, path + maskname)
+            readname_list.append("EMD-%s/map/%s" % (emdid, mapid))
+            writename_list.append("emd_%s.map" % (emdid))
+        try:
+            for readname, writename in zip(readname_list, writename_list):
+                name_list.append(path + writename)
+                if readname.endswith((".map")):
+                    shutil.copy2(localdb + readname, path + writename)
+                elif readname.endswith((".gz")):
+                    with gzip.open(localdb + readname, "rb") as fmap:
+                        file_content = fmap.read()
+                    with open(path + writename, "wb") as f:
+                        f.write(file_content)
+            return [name_list, claimed_resol, pointg, maskname]
+        except Exception as e:
+            raise e
+
+
 if __name__=="__main__":
     results = fetch_halfmaps(23356)
     print(results)
