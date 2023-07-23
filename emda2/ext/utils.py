@@ -208,11 +208,13 @@ def determine_ibin(bin_fsc, cutoff=0.15):
 
 
 def get_avg_fsc(binfsc, bincounts):
+    fsc_avg = 0.
     fsc_filtered = filter_fsc(bin_fsc=binfsc, thresh=0.0)
-    fsc_avg = np.average(
-        a=fsc_filtered[np.nonzero(fsc_filtered)],
-        weights=bincounts[np.nonzero(fsc_filtered)],
-    )
+    if np.sum(fsc_filtered) > 0.:
+        fsc_avg = np.average(
+            a=fsc_filtered[np.nonzero(fsc_filtered)],
+            weights=bincounts[np.nonzero(fsc_filtered)],
+        )
     return fsc_avg
 
 
