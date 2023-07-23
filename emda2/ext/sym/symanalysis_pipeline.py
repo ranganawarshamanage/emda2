@@ -598,6 +598,8 @@ def main(dict, fobj=None):
         else:
             label = "0000"
         dict["label"] = label
+    else:
+        label = dict["label"]
 
     # file names
     logname = "emd-%s-pointgroup.txt" % label
@@ -618,7 +620,7 @@ def main(dict, fobj=None):
     # get the mask
     if dict["mask"] is None:
         # calculate EMDA mask from map
-        dict["maskname"] = maskname
+        dict["mask"] = maskname
         mask_from_halfmaps(half1=dict["half1"], maskname=maskname)
         mm = iotools.Map(name=maskname)
         mm.read()
@@ -774,8 +776,8 @@ def my_func(emdbid):
                     logfile.close()
                     print("Structure %s done!" % emdbid)
 
-            if final_results["maskname"] is not None:
-                os.remove(final_results["maskname"])
+            if final_results["mask"] is not None:
+                os.remove(final_results["mask"])
 
             if final_results["reboxedmapname"] is not None:
                 os.remove(final_results["reboxedmapname"])
