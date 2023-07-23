@@ -538,7 +538,7 @@ def my_func(emdbid):
 
             if final_results["pmap"] is not None:
                 os.remove(final_results["pmap"])
-                os.remove(final_results["mask"])
+                #os.remove(final_results["mask"])
         else:
             print("Empty results from xml_read!")
     except ValueError:
