@@ -380,6 +380,8 @@ def main(dict, fobj=None):
         else:
             label = "0000"
         dict["label"] = label
+    else:
+        label = dict["label"]
 
     # file names
     logname = "emd-%s-pointgroup.txt" % label
