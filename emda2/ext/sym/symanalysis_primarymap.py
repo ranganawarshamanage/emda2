@@ -42,6 +42,7 @@ from emda2.ext.sym.symanalysis_pipeline import (
     get_pg_perlevel,
     writemap,
 )
+from emda2.ext.sym.download_halfmaps import fetch_primarymap
 
 
 def get_pg(dict, fobj):
@@ -101,11 +102,12 @@ def get_pg(dict, fobj):
     # calculate halfmap FSC
     # binfsc = em.fsc(f1=fhf1, f2=fhf2, bin_idx=bin_idx, nbin=nbin)
     binfsc = np.zeros(nbin, "float")
-    fsc_full = 2 * binfsc / (1.0 + binfsc)  # fullmap FSC
+    fsc_full = np.zeros(nbin, "float")
+    """ fsc_full = 2 * binfsc / (1.0 + binfsc)  # fullmap FSC
     emdalogger.log_string(fobj, "Halfmap and Fullmap FSCs")
     emdalogger.log_fsc(
         fobj, {"Resol.": res_arr, "FSC(half)": binfsc, "FSC(full)": fsc_full}
-    )
+    ) """
 
     map1 = np.real(ifftshift(ifftn(ifftshift(fo)))) * mask
     nx, ny, nz = map1.shape
@@ -366,15 +368,15 @@ def get_pg(dict, fobj):
 
 
 def main(dict, fobj=None):
-    # check if halfmaps are present
+    # check if primary map is present
     if not (os.path.isfile(dict["pmap"]) and (os.path.isfile(dict["pmap"]))):
         raise SystemExit("Primary map is missing!")
 
     # make a label
     if dict["label"] is None:
-        pattern = r"emd_\d+"
+        pattern = r'emd_(\d+).m'
         if re.search(pattern, dict["pmap"]):
-            label = re.findall("\d+", dict["pmap"])[0]
+            label = re.findall("\d+", dict["pmap"])[-1]
         else:
             label = "0000"
         dict["label"] = label
@@ -405,14 +407,14 @@ def main(dict, fobj=None):
     m1 = iotools.Map(dict["pmap"])
     m1.read()
 
-    # reboxing halfmaps using the mask
+    # reboxing primary map using the mask
     print("Reboxing...")
     rmap1, rmask = em.rebox_by_mask(
         arr=m1.workarr, mask=mm.workarr, mask_origin=mm.origin
     )
     dict["rmap1"] = rmap1
     dict["rmask"] = rmask
-    fullmap = m1.workarr
+    fullmap = rmap1 # m1.workarr
     dict["fullmap"] = fullmap
 
     newcell = [
@@ -429,7 +431,7 @@ def main(dict, fobj=None):
     dict["res_arr"] = res_arr
     dict["bin_idx"] = bin_idx
     dict["sgrid"] = sgrid
-    # if axeslist and orderlist present don't run proshade
+    # if axeslist and orderlist present, don't run proshade
     if dict["axlist"] is not None and dict["orderlist"] is not None:
         assert len(dict["axlist"]) == len(dict["orderlist"])
         if dict["fsclist"] is None:
@@ -465,3 +467,70 @@ def main(dict, fobj=None):
             )
             fobj.write(strng)
     return dict
+
+
+def my_func(emdbid):
+    params = {
+        "half1": None,
+        "half2": None,
+        "mask": None,
+        "user_pg": None,
+        "resol": None,
+        "label": emdbid,
+        "resol4refinement": 5.0,
+        "output_maps": False,
+        "symaverage": False,
+        "axlist": None,
+        "orderlist": None,
+        "fsclist": None,
+        "lowres_cutoff": 10.0,
+        "pg_decide_fsc": 0.9,
+    }
+    try:
+        results = fetch_primarymap(emdbid)
+        if len(results) > 0:
+            name_list, resol, pg, maskfile = results
+            params["pmap"] = name_list[0]
+            params["mask"] = maskfile
+            params["resol"] = float(resol)
+            params["user_pg"] = pg
+            if float(resol) < params["lowres_cutoff"] and (pg is not None):
+                filename = "pg_log_emd-%s.txt" % emdbid
+                logfile = open(filename, "w")
+                logfile.write("\nEMD-{} {} {}\n".format(emdbid, resol, pg))
+                final_results = main(params, logfile)
+                if (
+                    final_results["proshade_pg"] is not None
+                    and final_results["emda_pg"] is not None
+                ):
+                    proshade_pg = final_results["proshade_pg"]
+                    emda_pg = final_results["emda_pg"]
+                    if proshade_pg == "0":
+                        proshade_pg = "C1"
+                    if proshade_pg == "I0":
+                        proshade_pg = "I"
+                    if proshade_pg == "O0":
+                        proshade_pg = "O"
+                    if emda_pg == "None":
+                        emda_pg = "C1"
+                    logfile.write("emda pointgroup: %s\n" % emda_pg)
+                    strng = "xEMD-{} {} {} {} {}\n".format(
+                        emdbid, resol, pg, proshade_pg, emda_pg
+                    )
+                    logfile.write(strng)
+                    logfile.close()
+                    print("Structure %s done!" % emdbid)
+
+            if final_results["maskname"] is not None:
+                os.remove(final_results["maskname"])
+
+            if final_results["reboxedmapname"] is not None:
+                os.remove(final_results["reboxedmapname"])
+
+            if final_results["pmap"] is not None:
+                os.remove(final_results["pmap"])
+                os.remove(final_results["mask"])
+        else:
+            print("Empty results from xml_read!")
+    except ValueError:
+        pass
