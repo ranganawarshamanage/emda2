@@ -531,7 +531,7 @@ def my_func(emdbid):
                     print("Structure %s done!" % emdbid)
 
             if final_results["mask"] is not None:
-                os.remove(final_results["maskname"])
+                os.remove(final_results["mask"])
 
             if final_results["reboxedmapname"] is not None:
                 os.remove(final_results["reboxedmapname"])
