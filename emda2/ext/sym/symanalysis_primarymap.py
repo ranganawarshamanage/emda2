@@ -492,6 +492,7 @@ def my_func(emdbid):
         "axlist": None,
         "orderlist": None,
         "fsclist": None,
+        "fitfsc": 0.1,
         "lowres_cutoff": 10.0,
         "pg_decide_fsc": 0.9,
     }
