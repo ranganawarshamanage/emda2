@@ -495,6 +495,7 @@ def my_func(emdbid):
         "fitfsc": 0.1,
         "lowres_cutoff": 10.0,
         "pg_decide_fsc": 0.9,
+        "ncycles": 10,
     }
     try:
         results = fetch_primarymap(emdbid)
