@@ -364,12 +364,14 @@ def main(dict, fobj=None):
     # check if primary map is present
     if not (os.path.isfile(dict["pmap"])):
         if fobj is not None:
-            emdalogger.log_string(fobj, "Primary map is missing!")
+            emdalogger.log_string(
+                fobj, "%s Primary map is missing" % dict["pmap"]
+            )
         return dict
 
     # make a label
     if dict["label"] is None:
-        pattern = r'emd_(\d+).m'
+        pattern = r"emd_(\d+).m"
         if re.search(pattern, dict["pmap"]):
             label = re.findall("\d+", dict["pmap"])[-1]
         else:
@@ -390,13 +392,15 @@ def main(dict, fobj=None):
 
     # get the mask
     if dict["mask"] is None:
-        emdalogger.log_string(fobj, "Mask not given")
+        emdalogger.log_string(fobj, "%s Mask not given" % dict["mask"])
         return dict
     else:
         # check if mask file is present
         if not (os.path.isfile(dict["mask"])):
-            emdalogger.log_string(fobj, "Given mask not present")
-            return dict            
+            emdalogger.log_string(
+                fobj, "%s Given mask not present" % dict["mask"]
+            )
+            return dict
         mm = iotools.Map(name=dict["mask"])
         mm.read()
 
@@ -406,12 +410,14 @@ def main(dict, fobj=None):
 
     # check if m1.workarr is cubic
     if len(set(m1.workarr.shape)) != 1:
-        emdalogger.log_string(fobj, "Map is non-cubic")
+        emdalogger.log_string(fobj, "%s Map is non-cubic" % dict["pmap"])
         return dict
 
     # check map and mask have the same shape
     if m1.workarr.shape != mm.workarr.shape:
-        emdalogger.log_string(fobj, "Map and mask have different shapes")
+        emdalogger.log_string(
+            fobj, "%s Map and mask have different shapes" % dict["pmap"]
+        )
         return dict
 
     # reboxing primary map using the mask
