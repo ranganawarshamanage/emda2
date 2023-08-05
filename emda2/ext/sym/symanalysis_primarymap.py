@@ -405,7 +405,7 @@ def main(dict, fobj=None):
     m1.read()
 
     # check if m1.workarr is cubic
-    if len(set(m1.workarr)) != 1:
+    if len(set(m1.workarr.shape)) != 1:
         emdalogger.log_string(fobj, "Map is non-cubic")
         return dict
 
