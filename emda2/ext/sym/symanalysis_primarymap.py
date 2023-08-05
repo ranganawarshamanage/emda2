@@ -27,15 +27,8 @@ from emda2.ext.utils import (
 )
 import fcodes2
 from emda2.ext.sym import axis_refinement
-
-# from more_itertools import sort_together
-# from emda2.ext.sym import pgcode
-# from emda2.ext.sym.download_halfmaps import fetch_halfmaps
 from emda2.core import emdalogger
 from emda2.core.emdalogger import vec2string, list2string
-
-# from emda2.ext.sym.decide_pointgroup import decide_pointgroup
-# import emda2.ext.sym.average_symcopies as avgsym
 from emda2.ext.sym.symanalysis_pipeline import (
     _lowpassmap_butterworth,
     test,
@@ -369,8 +362,10 @@ def get_pg(dict, fobj):
 
 def main(dict, fobj=None):
     # check if primary map is present
-    if not (os.path.isfile(dict["pmap"]) and (os.path.isfile(dict["pmap"]))):
-        raise SystemExit("Primary map is missing!")
+    if not (os.path.isfile(dict["pmap"])):
+        if fobj is not None:
+            emdalogger.log_string(fobj, "Primary map is missing!")
+        return dict
 
     # make a label
     if dict["label"] is None:
@@ -393,21 +388,31 @@ def main(dict, fobj=None):
     if fobj is None:
         fobj = open(logname, "w")
 
-    """ if dict["resol"] is not None:
-        dict["resol"] = (
-            dict["resol"] * 1.1
-        )  # taking 10% less resolution of author claimed """
-
     # get the mask
     if dict["mask"] is None:
-        raise SystemExit("Please include a mask")
+        emdalogger.log_string(fobj, "Mask not given")
+        return dict
     else:
+        # check if mask file is present
+        if not (os.path.isfile(dict["mask"])):
+            emdalogger.log_string(fobj, "Given mask not present")
+            return dict            
         mm = iotools.Map(name=dict["mask"])
         mm.read()
 
     # reading primary map
     m1 = iotools.Map(dict["pmap"])
     m1.read()
+
+    # check if m1.workarr is cubic
+    if len(set(m1.workarr)) != 1:
+        emdalogger.log_string(fobj, "Map is non-cubic")
+        return dict
+
+    # check map and mask have the same shape
+    if m1.workarr.shape != mm.workarr.shape:
+        emdalogger.log_string(fobj, "Map and mask have different shapes")
+        return dict
 
     # reboxing primary map using the mask
     print("Reboxing...")
@@ -416,7 +421,7 @@ def main(dict, fobj=None):
     )
     dict["rmap1"] = rmap1
     dict["rmask"] = rmask
-    fullmap = rmap1 # m1.workarr
+    fullmap = rmap1  # m1.workarr
     dict["fullmap"] = fullmap
 
     newcell = [
@@ -540,8 +545,9 @@ def my_func(emdbid):
 
             if final_results["pmap"] is not None:
                 os.remove(final_results["pmap"])
-                #os.remove(final_results["mask"])
         else:
-            print("Empty results from xml_read!")
-    except ValueError:
+            print("%s Empty results from xml_read!" % emdbid)
+    except Exception as e:
+        print("Other Eror Occured for %s" % emdbid)
+        print(e)
         pass
