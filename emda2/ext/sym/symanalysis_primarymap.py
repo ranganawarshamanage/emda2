@@ -11,7 +11,10 @@ Mozilla Public License, version 2.0; see LICENSE.
 # Compute FSC-sym from fullmap and sym.copy
 # Compare FSC-full vs FSC-sym
 import numpy as np
-import re, math, os
+import sys
+import re
+# import math
+import os
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
 from emda2.core import iotools, plotter, fsctools
 import emda2.emda_methods2 as em
@@ -94,7 +97,7 @@ def get_pg(dict, fobj):
 
     # calculate halfmap FSC
     # binfsc = em.fsc(f1=fhf1, f2=fhf2, bin_idx=bin_idx, nbin=nbin)
-    binfsc = np.zeros(nbin, "float")
+    # binfsc = np.zeros(nbin, "float")
     fsc_full = np.zeros(nbin, "float")
     """ fsc_full = 2 * binfsc / (1.0 + binfsc)  # fullmap FSC
     emdalogger.log_string(fobj, "Halfmap and Fullmap FSCs")
@@ -420,6 +423,14 @@ def main(dict, fobj=None):
         )
         return dict
 
+    # check if the map is too big to process
+    size_of_map_GB = sys.getsizeof(m1.workarr) / (1024 * 1024 * 1024)
+    if size_of_map_GB > dict["maxsizeGB"]:
+        emdalogger.log_string(
+            fobj, "Increase memory for %s" % dict["pmap"]
+        )
+        return dict        
+
     # reboxing primary map using the mask
     print("Reboxing...")
     rmap1, rmask = em.rebox_by_mask(
@@ -507,6 +518,7 @@ def my_func(emdbid):
         "lowres_cutoff": 10.0,
         "pg_decide_fsc": 0.9,
         "ncycles": 10,
+        "maxsizeGB": 400.0,
     }
     try:
         results = fetch_primarymap(emdbid)
