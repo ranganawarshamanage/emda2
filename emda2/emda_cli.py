@@ -237,6 +237,36 @@ reboxmap.add_argument(
     help="output map (mrc/map)",
 )
 
+# rebox a map based on a mask
+updatecell = subparsers.add_parser(
+    "updatecell", description="update the cell of the map"
+)
+updatecell.add_argument(
+    "--map", required=True, type=str, help="input map (.map/.mrc)"
+)
+updatecell.add_argument(
+    "--newcell",
+    required=False,
+    nargs="+",
+    type=float,
+    default=None,
+    help="input newcell in the format a b c",
+)
+updatecell.add_argument(
+    "--magf",
+    required=False,
+    type=float,
+    default=1.0,
+    help="magnification to be applied for the cell. default to 1.",
+)
+updatecell.add_argument(
+    "--newmap",
+    required=False,
+    type=str,
+    default="updatedmap.mrc",
+    help="name for the cell updated map. default to updatedmap.mrc",
+)
+
 
 def find_pg(args):
     # find pointgroup of the map
@@ -411,6 +441,24 @@ def rebox_map(args):
     mmrbx.write()
 
 
+def update_cell(args):
+    m1 = iotools.Map(args.map)
+    m1.read()
+    m2 = iotools.Map(args.newmap)
+    m2.cell = m1.cell
+    m2.arr = m1.arr
+    m2.origin = m1.origin
+    if args.newcell is not None:
+        args.magf = None
+        if len(args.newcell) > 3:
+            m2.cell = args.newcell[:3]
+    elif args.magf is not None:
+        m2.cell = [a * args.magf for a in m1.cell]
+    else:
+        print("No change in cell!")
+    m2.write()
+
+
 def main(command_line=None):
     # f = open("EMDA.txt", "w")
     # f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
@@ -430,6 +478,8 @@ def main(command_line=None):
             rotate_map(args)
         if args.command == "reboxmap":
             rebox_map(args)
+        if args.command == "updatecell":
+            update_cell(args)
 
 
 def emda_commands():
@@ -452,6 +502,7 @@ def emda_commands():
     )
     print("   rotatemap    - apply a rotation on the map (Real space)")
     print("   rebox        - rebox a map based on a mask")
+    print("   updatecell   - update the cell")
     # print('   info      - output basic information about the map')
 
     # print('   halffsc   - computes FSC between half maps')
