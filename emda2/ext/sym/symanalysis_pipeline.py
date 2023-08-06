@@ -574,7 +574,7 @@ def get_pg_perlevel(a, axes, folds, level):
     pglist = []
     for i in range(a.shape[1]):
         mask = a[:, i] >= level
-        if all(not element for element in mask):
+        if all(not element for element in list(mask)):
             pglist.append('C1')
         else:
             axlist = []
