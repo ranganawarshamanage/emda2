@@ -425,7 +425,7 @@ def main(dict, fobj=None):
 
     # check if the map is too big to process
     size_of_map_GB = sys.getsizeof(m1.workarr) / (1024 * 1024 * 1024)
-    if size_of_map_GB > dict["maxsizeGB"]:
+    if size_of_map_GB > dict["maxsizeMB"] / 1024:
         emdalogger.log_string(
             fobj, "Increase memory for %s" % dict["pmap"]
         )
@@ -518,7 +518,7 @@ def my_func(emdbid):
         "lowres_cutoff": 10.0,
         "pg_decide_fsc": 0.9,
         "ncycles": 10,
-        "maxsizeGB": 400.0,
+        "maxsizeMB": 400.0,
     }
     try:
         results = fetch_primarymap(emdbid)
