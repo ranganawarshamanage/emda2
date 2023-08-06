@@ -42,8 +42,10 @@ def decide_pointgroup(axeslist, orderlist):
         angle = cosine_angle(axeslist[0], axeslist[1])
         # print('angle: ', angle)
         if abs(angle - 63.47) <= ang_tol or abs(angle - 116.57) <= ang_tol:
-            assert orderlist[0] == orderlist[1] == 5
-            pg = "I"
+            if orderlist[0] == orderlist[1] == 5:
+                pg = "I"
+            else:
+                return ["--"]
         elif abs(angle - 90.0) < ang_tol:
             # options - O, D
             if orderlist[0] == orderlist[1] == 4:
@@ -69,7 +71,7 @@ def decide_pointgroup(axeslist, orderlist):
             else:
                 pg = "C" + str(orderlist[0] * orderlist[1])
         else:
-            pg = "Unknown"
+            pg = "--"
         return [pg]
 
     if len(axeslist) > 2:
@@ -158,11 +160,11 @@ def decide_pointgroup(axeslist, orderlist):
         if all(mask):
             order = max(orderlist)
             if order >= 360:
-                pg = "Ukwn"
+                pg = "--"
             else:
                 pg = "C%s" % order
         else:
-            pg = "Unknown"
+            pg = "--"
         return [pg]
 
 
