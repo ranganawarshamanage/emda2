@@ -518,7 +518,7 @@ def my_func(emdbid):
         "lowres_cutoff": 10.0,
         "pg_decide_fsc": 0.9,
         "ncycles": 10,
-        "maxsizeMB": 400.0,
+        "maxsizeMB": 2048.0,
     }
     try:
         results = fetch_primarymap(emdbid)
