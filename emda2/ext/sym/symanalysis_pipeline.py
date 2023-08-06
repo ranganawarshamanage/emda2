@@ -574,14 +574,17 @@ def get_pg_perlevel(a, axes, folds, level):
     pglist = []
     for i in range(a.shape[1]):
         mask = a[:, i] >= level
-        axlist = []
-        orderlist = []
-        for j, ax in enumerate(axes):
-            if mask[j]:
-                axlist.append(ax)
-                orderlist.append(folds[j])
-        pg = decide_pointgroup(axlist, orderlist)[0]
-        pglist.append(pg)
+        if all(not element for element in mask):
+            pglist.append('C1')
+        else:
+            axlist = []
+            orderlist = []
+            for j, ax in enumerate(axes):
+                if mask[j]:
+                    axlist.append(ax)
+                    orderlist.append(folds[j])
+            pg = decide_pointgroup(axlist, orderlist)[0]
+            pglist.append(pg)
     return pglist
 
 
