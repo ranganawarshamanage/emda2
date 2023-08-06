@@ -13,6 +13,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 import numpy as np
 import sys
 import re
+
 # import math
 import os
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
@@ -426,10 +427,13 @@ def main(dict, fobj=None):
     # check if the map is too big to process
     size_of_map_GB = sys.getsizeof(m1.workarr) / (1024 * 1024 * 1024)
     if size_of_map_GB > dict["maxsizeMB"] / 1024:
+        emdalogger.log_string(fobj, "Increase memory for %s" % dict["pmap"])
         emdalogger.log_string(
-            fobj, "Increase memory for %s" % dict["pmap"]
+            fobj,
+            "Map size= % .2f GB, Limit= % .2f GB"
+            % (size_of_map_GB, dict["maxsizeMB"] / 1024),
         )
-        return dict        
+        return dict
 
     # reboxing primary map using the mask
     print("Reboxing...")
