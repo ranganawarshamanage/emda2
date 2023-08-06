@@ -504,26 +504,27 @@ def main(dict, fobj=None):
     return dict
 
 
-def my_func(emdbid):
-    params = {
-        "half1": None,
-        "half2": None,
-        "mask": None,
-        "user_pg": None,
-        "resol": None,
-        "label": emdbid,
-        "resol4refinement": 5.0,
-        "output_maps": False,
-        "symaverage": False,
-        "axlist": None,
-        "orderlist": None,
-        "fsclist": None,
-        "fitfsc": 0.1,
-        "lowres_cutoff": 10.0,
-        "pg_decide_fsc": 0.9,
-        "ncycles": 10,
-        "maxsizeMB": 2048.0,
-    }
+def my_func(emdbid, params=None):
+    if params is None:
+        params = {
+            "half1": None,
+            "half2": None,
+            "mask": None,
+            "user_pg": None,
+            "resol": None,
+            "label": emdbid,
+            "resol4refinement": 5.0,
+            "output_maps": False,
+            "symaverage": False,
+            "axlist": None,
+            "orderlist": None,
+            "fsclist": None,
+            "fitfsc": 0.1,
+            "lowres_cutoff": 10.0,
+            "pg_decide_fsc": 0.9,
+            "ncycles": 10,
+            "maxsizeMB": 2048.0,
+        }
     try:
         results = fetch_primarymap(emdbid)
         if len(results) > 0:
