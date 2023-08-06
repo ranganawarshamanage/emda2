@@ -5,6 +5,7 @@ MRC Laboratory of Molecular Biology
 This software is released under the
 Mozilla Public License, version 2.0; see LICENSE.
 """
+import traceback
 
 # Run codes for proshade
 
@@ -83,7 +84,7 @@ def get_symmops_from_proshade(mapname, fobj=None):
                     )
                 )
             if fobj is not None:
-                fobj.write("Proshade results\n")
+                fobj.write("Proshade results for %s\n" % mapname)
                 for iter in range(0, len(recSymmetryAxes)):
                     fobj.write(
                         "  %s    %+1.3f    %+1.3f    %+1.3f    %+1.3f    %+1.4f   "
@@ -111,8 +112,15 @@ def get_symmops_from_proshade(mapname, fobj=None):
                 afsc.append(row[6])
             return [fold, x, y, z, peakh, proshade_pg, afsc]
         else:
+            if fobj is not None:
+                fobj.write("Proshade gave empty axlist on %s\n" % mapname)
+            print("Proshade gave empty axlist on %s\n" % mapname)
             return []
     except RuntimeError as e:
+        if fobj is not None:
+            fobj.write("Proshade fail on %s\n" % mapname)
+            fobj.write(traceback.format_exc())
+        print("Proshade fail on %s\n" % mapname)
         print(e)
 
 
