@@ -583,6 +583,10 @@ def check_octahedral(emmap1, octahedral_2axes, octahedral_2axes_fsc, fobj):
         return [False]
 
 
+def check_icosahedral(emmap1, axes, octahedral_2axes_fsc, fobj):
+    pass
+
+
 def five_folds(emmap1, axes, sordern, fscs, fobj):
     sorder5ax, sorder3ax, sorder2ax, sordernax = axes
     sorder5fsc, sorder3fsc, sorder2fsc, sordernfsc = fscs
@@ -837,6 +841,10 @@ def single_5fold(emmap1, axes, sordern, fscs, fobj):
             (ref_axlist, ref_tlist, _, _, ref_fsclist) = refinement_results
             fsc_refined_5fold = ref_fsclist[0]
             if fsc_refined_5fold > pg_decide_fsc:
+                # NOTE: even if there's one single 5-fold, don not forget
+                # to check 2 and 3 folds that can give an I
+                # check for I if there are 2 and 3 folds HERE
+
                 emdalogger.log_string(
                     fobj, "5-fold is real. Checking for D or C..."
                 )
@@ -1082,7 +1090,6 @@ def no5folds(emmap1, axes, sordern, fscs, fobj):
                         % (vec2string(sorder3ax[i]), 3, sorder3fsc[i]),
                     )
                     angle = cosine_angle(sorder3ax[0], sorder3ax[i])
-                    fobj.write("   Angle between them: % .3f" % angle)
                     emdalogger.log_string(
                         fobj, "   Angle between them: % .3f" % angle
                     )
@@ -1282,6 +1289,8 @@ def no5folds(emmap1, axes, sordern, fscs, fobj):
                         )
                     else:
                         # both 3-folds are not true
+                        axes = [sorder2ax, sordernax]
+                        fscs = [sorder2fsc, sordernfsc]
                         pg = no53folds(emmap1, axes, sordern, fscs, fobj)
                 else:
                     pg = single3fold(
