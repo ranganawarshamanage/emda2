@@ -34,7 +34,7 @@ setup(name='emda2',
         'tabulate',
         'more_itertools',
         #'proshade',
-        'proshade @ git+https://github.com/GaribMurshudov/proshade_mod1.git',
+        #'proshade @ git+https://github.com/GaribMurshudov/proshade_mod1.git',
         'scikit-image'
         ],
     ext_modules =[ex1],
