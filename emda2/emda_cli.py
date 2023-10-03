@@ -297,6 +297,8 @@ def make_mapmask(args):
             maskname = "emdamapmask_emd-%s.mrc" % m.group(1)
         except NameError:
             maskname = "emdamapmask_1.mrc"
+    else:
+        maskname = args.maskname
 
     if half2 is None:
         try:
