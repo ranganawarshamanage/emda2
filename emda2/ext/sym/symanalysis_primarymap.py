@@ -509,6 +509,7 @@ def my_func(emdbid, params=None):
         params = {
             "half1": None,
             "half2": None,
+            "pmap": None,
             "mask": None,
             "user_pg": None,
             "resol": None,
@@ -529,10 +530,14 @@ def my_func(emdbid, params=None):
         results = fetch_primarymap(emdbid)
         if len(results) > 0:
             name_list, resol, pg, maskfile = results
-            params["pmap"] = name_list[0]
-            params["mask"] = maskfile
-            params["resol"] = float(resol)
-            params["user_pg"] = pg
+            if params["pmap"] is None:
+                params["pmap"] = name_list[0]
+            if params["mask"] is None:
+                params["mask"] = maskfile
+            if params["resol"] is None:
+                params["resol"] = float(resol)
+            if params["user_pg"] is None:
+                params["user_pg"] = pg
             if float(resol) < params["lowres_cutoff"] and (pg is not None):
                 filename = "pg_log_emd-%s.txt" % emdbid
                 logfile = open(filename, "w")
