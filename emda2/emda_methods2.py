@@ -196,6 +196,20 @@ def mask_from_map_connectedpixels(m1, binthresh=None):
     return masklist
 
 
+def applymask(m1, mm):
+    """
+    Returns mask applied map as a 3D numpy array
+
+    Inputs:
+        m1: map object
+        mm: mask object
+
+    Outputs:
+        arr: mask applied map as 3D numpy array
+    """
+    return m1.workarr * mm.workarr
+
+
 def lowpass_map(
     uc,
     arr1,
@@ -930,6 +944,20 @@ def mask_from_halfmaps(h1, h2, emdbid="rhovar"):
 
     mask = hfmask.main(h1=h1, h2=h2, emdbid=emdbid)
     return [mask]
+
+
+def emda_weightedmap(h1, h2, bin_idx, nbin, res_arr, B=None):
+    import emda2.ext.emda_weightedmap as nem
+
+    weightedmap = nem.bestmap(
+        f1=np.fft.fftshift(np.fft.fftn(h1.workarr)), 
+        f2=np.fft.fftshift(np.fft.fftn(h2.workarr)), 
+        mode=1, 
+        bin_idx=bin_idx, 
+        nbin=nbin, 
+        res_arr=res_arr, 
+        B=B)
+    return np.real(np.fft.ifftn(np.fft.ifftshift(weightedmap)))
 
 
 """ def symmetry_average_map(mlist, axlist, folds, rot_centre=None):

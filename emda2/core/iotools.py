@@ -445,6 +445,14 @@ def model_transform_gm(
     st.make_mmcif_document().write_file(outfilename)
 
 
+def output_to_table(dataframe, filename="data_emda.txt"):
+    with open(filename, 'a') as f:
+        f.write(
+            dataframe.to_string(header=True, index=False)
+        )
+    print("data_emda.txt file was written!")
+
+
 if __name__ == "__main__":
     imap = sys.argv[1:][0]
 
