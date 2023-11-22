@@ -292,11 +292,7 @@ def make_mapmask(args):
     half2 = args.half2
 
     if args.maskname is None:
-        try:
-            m = re.search("emd_(.+)_half", half1)
-            maskname = "emdamapmask_emd-%s.mrc" % m.group(1)
-        except NameError:
-            maskname = "emdamapmask_1.mrc"
+        maskname = "emdamapmask_1.mrc"
     else:
         maskname = args.maskname
 

@@ -6,19 +6,18 @@ from emda2.core import iotools, plotter, maptools
 from numpy.fft import fftn, fftshift, ifftshift, ifftn
 from emda2.ext.utils import filter_fsc  # , get_ibin
 
-# from loc_averaging_anyradius import f_sphere
 from emda2.ext.mapmask import binary_closing, binary_dilation, globular_mask
 from emda2.ext.maskmap_class import make_soft
 from more_itertools import sort_together
 from skimage import measure
-from emda2.ext.sym.symanalysis_pipeline import writemap
+# from emda2.ext.sym.symanalysis_pipeline import writemap
 
 #
 from emda2.core import restools
 from scipy.signal import fftconvolve
 import matplotlib.pyplot as plt
 
-from emda.ext.mapfit import rdp_algo
+from emda2.ext import rdp_algo
 
 
 def create_mapmask_islandlabelling2(rho1, rho1avg, thresh):
@@ -291,16 +290,8 @@ def get_ibin(bin_fsc, cutoff):
 
 
 def main(h1, h2, emdbid):
-    """m = re.search('emd_(.+)_half', half1)
-    emdbid = 'emd_%s'%m.group(1)
-    plotname_var = 'cdf_var_emd_%s.png'%m.group(1)
-    plotname_rho = 'cdf_rho_emd_%s.png'%m.group(1)
-    maskname = 'emdamapmask_emd-%s.mrc'%m.group(1)
-    half2 = half1.replace("half_map_1", "half_map_2")
-    h1 = iotools.Map(half1)
-    h1.read()
-    h2 = iotools.Map(half2)
-    h2.read()"""
+
+    print('Creating mask from halfmaps...')
 
     f1 = fftshift(fftn(fftshift(h1.workarr)))
     f2 = fftshift(fftn(fftshift(h2.workarr)))

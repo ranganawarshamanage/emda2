@@ -52,9 +52,10 @@ def binary_dilation(binary_arr, size=5):
 
 def mapmask_connectedpixels(m1, binary_threshold=None):
     from skimage import measure
+
     _, lwp = em.lowpass_map(uc=m1.workcell, arr1=m1.workarr, resol=15, filter="butterworth")
-    lwp = (lwp - np.mean(lwp)) / np.std(lwp)
     if binary_threshold is None:
+        lwp = (lwp - np.mean(lwp)) / np.std(lwp)
         binary_threshold = np.amax(lwp) / 20
     arr = lwp > binary_threshold
     blobs = arr
