@@ -1,14 +1,19 @@
-# create a cylinder and output as a mrc file
+# create a sphere and output as a mrc file
 
 import numpy as np
 import emda2.emda_methods2 as em
 from emda2.core import iotools
 import argparse
+from emda2.ext.maskmap_class import make_soft
 
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--mapname', type=str, required=True, help='map file mrc/map')
-#parser.add_argument('--secondmap', type=str, required=True, help='map2 file mrc/map')
+parser.add_argument('--radius', type=float, required=True, help='radius in Angstroms')
+parser.add_argument('--offset_x', type=float, required=False, default=0.0, help='offset along x in Angstroms')
+parser.add_argument('--offset_y', type=float, required=False, default=0.0, help='offset along y in Angstroms')
+parser.add_argument('--offset_z', type=float, required=False, default=0.0, help='offset along z in Angstroms')
+
 args = parser.parse_args()
 
 
@@ -51,12 +56,19 @@ def create_binary_sphere(r1):
 #length = 1.0
 #cylinder_array = create_cylinder_array(radius, height, length)
 
-sphere = create_binary_sphere(r1=26)
-
 m1 = iotools.Map(name=args.mapname)
 m1.read()
 
 nx, ny, nz = m1.workarr.shape
+
+pixsize = m1.workcell[0] / m1.workarr.shape[0]
+
+xoffset_pix = int(args.offset_x / pixsize)
+yoffset_pix = int(args.offset_y / pixsize)
+zoffset_pix = int(args.offset_z / pixsize)
+
+radius_pix = int(args.radius / pixsize)
+sphere = create_binary_sphere(r1=radius_pix)
 mx, my, mz = sphere.shape
 
 arr = np.zeros(m1.workarr.shape, dtype=int)
@@ -66,13 +78,18 @@ dx = (nx - mx) // 2
 dy = (ny - my) // 2
 dz = (nz - mz) // 2
 offset = 20 # pixels
-arr[dx+offset:dx+offset+mx, dy:dy+my, dz:dz+mz] = sphere
+arr[dx+xoffset_pix:dx+xoffset_pix+mx, 
+    dy+yoffset_pix:dy+yoffset_pix+my, 
+    dz+zoffset_pix:dz+zoffset_pix+mz] = sphere 
+
+# introduce soft edges
+soft_arr = make_soft(arr, 5)
 
 # Output mrc file
 
-m3 = iotools.Map(name='cylinder.mrc')
+m3 = iotools.Map(name='sphere.mrc')
 m3.cell = m1.cell
-m3.arr = arr
+m3.arr = soft_arr
 m3.axorder = m1.axorder
 m3.write()
 
