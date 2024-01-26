@@ -1,18 +1,25 @@
-# create a cylinder and output as a mrc file
+# create a sphere and output as a mrc file
 
 import numpy as np
+import sys
 import emda2.emda_methods2 as em
 from emda2.core import iotools
 import argparse
+from emda2.ext.maskmap_class import make_soft
 
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--mapname', type=str, required=True, help='map file mrc/map')
-#parser.add_argument('--secondmap', type=str, required=True, help='map2 file mrc/map')
+parser.add_argument('--radius', type=float, required=True, help='radius in Angstroms')
+parser.add_argument('--softedge_thickness', type=float, required=False, default=5, help='thickness of softedge in Angstroms')
+parser.add_argument('--offset_x', type=float, required=False, default=0.0, help='offset along x in Angstroms')
+parser.add_argument('--offset_y', type=float, required=False, default=0.0, help='offset along y in Angstroms')
+parser.add_argument('--offset_z', type=float, required=False, default=0.0, help='offset along z in Angstroms')
+
 args = parser.parse_args()
 
 
-def create_cylinder_array(radius, height, length, resolution=64):
+""" def create_cylinder_array(radius, height, length, resolution=64):
     # Set up a grid
     x = np.linspace(-length/2, length/2, resolution)
     y = np.linspace(-radius, radius, resolution)
@@ -24,7 +31,7 @@ def create_cylinder_array(radius, height, length, resolution=64):
     cylinder_mask = x**2 + y**2 <= radius**2
     cylinder_array[cylinder_mask] = 1
 
-    return cylinder_array
+    return cylinder_array """
 
 
 def create_binary_sphere(r1):
@@ -51,12 +58,25 @@ def create_binary_sphere(r1):
 #length = 1.0
 #cylinder_array = create_cylinder_array(radius, height, length)
 
-sphere = create_binary_sphere(r1=26)
-
 m1 = iotools.Map(name=args.mapname)
 m1.read()
 
 nx, ny, nz = m1.workarr.shape
+
+pixsize = m1.workcell[0] / m1.workarr.shape[0]
+
+xoffset_pix = int(args.offset_x / pixsize)
+yoffset_pix = int(args.offset_y / pixsize)
+zoffset_pix = int(args.offset_z / pixsize)
+
+radius_pix = int(args.radius / pixsize)
+if any([nx, ny, nz]) < radius_pix:
+    maxradius = (m1.workcell[0] - 2 * args.softedge_thickness) / 2
+    print("Given radius is bigger than half of the box"
+        "\nMake sure your radius <= %f Angstroms" % (maxradius))
+    raise SystemExit()
+soft_thickness_pix = int(args.softedge_thickness / pixsize)
+sphere = create_binary_sphere(r1=radius_pix)
 mx, my, mz = sphere.shape
 
 arr = np.zeros(m1.workarr.shape, dtype=int)
@@ -65,14 +85,18 @@ arr = np.zeros(m1.workarr.shape, dtype=int)
 dx = (nx - mx) // 2
 dy = (ny - my) // 2
 dz = (nz - mz) // 2
-offset = 20 # pixels
-arr[dx+offset:dx+offset+mx, dy:dy+my, dz:dz+mz] = sphere
+arr[dx+xoffset_pix:dx+xoffset_pix+mx, 
+    dy+yoffset_pix:dy+yoffset_pix+my, 
+    dz+zoffset_pix:dz+zoffset_pix+mz] = sphere 
+
+# introduce soft edges
+soft_arr = make_soft(arr, soft_thickness_pix)
 
 # Output mrc file
 
-m3 = iotools.Map(name='cylinder.mrc')
+m3 = iotools.Map(name='spheremask_emda.mrc')
 m3.cell = m1.cell
-m3.arr = arr
+m3.arr = soft_arr
 m3.axorder = m1.axorder
 m3.write()
 

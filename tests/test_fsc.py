@@ -14,12 +14,18 @@ m1 = iotools.Map(name=args.map1name)
 m1.read()
 m2 = iotools.Map(name=args.map2name)
 m2.read()
-mm = iotools.Map(name=args.maskname)
-mm.read()
 
-nbin, res_arr, bin_idx, _ = em.get_binidx(m1.cell, m1.arr)
-twomapfsc = em.fsc(f1=np.fft.fftshift(np.fft.fftn(m1.workarr * mm.workarr)),
-                f2=np.fft.fftshift(np.fft.fftn(m2.workarr * mm.workarr)),
+if args.maskname is not None:
+    mm = iotools.Map(name=args.maskname)
+    mm.read()
+    mask = mm.workarr
+else:
+    mask = 1.0
+
+nbin, res_arr, bin_idx, _ = em.get_binidx(m1.cell, m1.workarr)
+
+twomapfsc = em.fsc(f1=np.fft.fftshift(np.fft.fftn(m1.workarr * mask)),
+                f2=np.fft.fftshift(np.fft.fftn(m2.workarr * mask)),
                 bin_idx=bin_idx,
                 nbin=nbin)
 
