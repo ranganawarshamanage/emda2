@@ -40,11 +40,6 @@ def combinestring(vec):
     return "-".join(("%.3f" % x for x in vec))
 
 
-def plot_fscs():
-    # local plot mimicking plotter.plot_nlines
-    pass
-
-
 def rotate_f(rm, f, bin_idx, ibin):
     if len(f.shape) == 3:
         f = np.expand_dims(f, axis=3)
@@ -71,11 +66,10 @@ def spherical2ax(phi, thet):
 
 
 def rotmat_spherical_crd(phi, thet, angle):
-    # all angle must be fed in Radians
+    # all angle are in Radians
     # Rotation from axis-angle using Rodriguez formula
     # R = cos(om)*I + sin(om)*a + (1-cos(om))*a^2
     om = float(angle)
-    # om = np.deg2rad(angle)
     s1 = sin(om)
     c1 = 1 - cos(om)
 
@@ -511,15 +505,17 @@ class Bfgs:
         t2 = np.asarray(
             [nx * t[0], ny * t[1], nz * t[2]], "float"
         ) * np.asarray(self.pixsize)
-        print(
-            "cycle, fval, afsc, ax, trans ",
-            info["Nfeval"],
-            fval.real,
-            self.afsc,
-            ax,
-            t2,
+        emdalogger.log_string(
+            self.fobj,
+            "cycle=%i, fval=%.3f, afsc=%.3f"
+            % (
+                info["Nfeval"],
+                fval.real,
+                self.afsc,
+            )
+
         )
-        self.fobj.write(
+        """ self.fobj.write(
             "cycle=%i, fval=%.3f, afsc=%.3f, ax=%s, trans=%s\n"
             % (
                 info["Nfeval"],
@@ -528,7 +524,7 @@ class Bfgs:
                 vec2string(ax),
                 vec2string(t2),
             )
-        )
+        ) """
         info["Nfeval"] += 1
         return -fval.real
 
@@ -549,7 +545,13 @@ class Bfgs:
         x = np.array([0.0, 0.0, 0.0, 0.0, 0.0], "float")
         options = {"maxiter": 2000}
         args = ({"Nfeval": 0},)
-        # self.method = 'L-BFGS-B'
+        bounds = [
+            (-5.0, 5.0),  # x
+            (-5.0, 5.0),  # y
+            (-5.0, 5.0),  # z
+            (0, 2 * np.pi),  # phi
+            (0, np.pi)  # theta
+        ]
         print("Optimization method: ", self.method)
         self.fobj.write("Optimization method: %s\n" % self.method)
         result = minimize(
@@ -561,6 +563,7 @@ class Bfgs:
             tol=tol,
             options=options,
             args=args,
+            bounds=bounds,
         )
         self.fobj.write("\n")
         if result.status:
@@ -573,29 +576,14 @@ class Bfgs:
 
 
 def fsc_between_static_and_transfomed_map(emmap1, rm, t, ergi=None, ibin=None):
-    print("RM for FSC calculation")
-    print(rm)
-    print("t: ", t)
-    # t = -np.asarray(t, 'float')
-    fo = emmap1.fo_lst[0]
-    eo = fo
-    # eo=emmap1.eo_lst[0]
+    eo = emmap1.fo_lst[0]
     bin_idx = emmap1.bin_idx
     nbin = emmap1.nbin
     if ibin is None:
         ibin = nbin
     nx, ny, nz = eo.shape
     st, _, _, _ = fc.get_st(nx, ny, nz, t)
-    # test - 1st translate then rotate
-    # e1 = eo*st
-    """ map2 = (ifftshift((ifftn(ifftshift(e1))).real))
-    e1x = fftshift(fftn(fftshift(map2)))
-    # rotate in real space
-    map2 = fc.trilinear_map(rm, map2, 0, nx, ny, nz)
-    ert = fftshift(fftn(fftshift(map2))) """
-    # ert = rotate_f(rm, e1, bin_idx, ibin)[:,:,:,0]
     ert = st * rotate_f(rm, eo, bin_idx, ibin)[:, :, :, 0]
-
     f1f2_fsc = fsctools.anytwomaps_fsc_covariance(eo, ert, bin_idx, nbin)[0]
     return f1f2_fsc, ert
 
