@@ -45,7 +45,7 @@ class Map:
             self.axorder = axorder
             # print('order: ', order)
             axes_order = "".join(["XYZ"[i] for i in axorder])
-            print("Axes order: ", axes_order)
+            # print("Axes order: ", axes_order)
             self.arr = np.moveaxis(
                 a=np.asarray(file.data, dtype="float"),
                 source=(2, 1, 0),

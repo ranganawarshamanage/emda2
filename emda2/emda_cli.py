@@ -40,6 +40,12 @@ cmdl_parser.add_argument(
 
 subparsers = cmdl_parser.add_subparsers(dest="command")
 
+# display map information
+mapinfo = subparsers.add_parser(
+    "mapinfo", description="detect point group of the map"
+)
+mapinfo.add_argument("--mapname", required=True, type=str, help="map name")
+
 # find pointgroup of the map
 pointg = subparsers.add_parser(
     "pointgroup", description="detect point group of the map"
@@ -143,14 +149,14 @@ calcfsc.add_argument(
 )
 
 # generate density mask using halfmaps
-mapmask = subparsers.add_parser(
-    "mapmask", description="generate mask for protein density"
+halfmapmask = subparsers.add_parser(
+    "halfmapmask", description="generate mask for protein density"
 )
-mapmask.add_argument("--half1", required=True, type=str, help="half map 1")
-mapmask.add_argument(
+halfmapmask.add_argument("--half1", required=True, type=str, help="half map 1")
+halfmapmask.add_argument(
     "--half2", required=False, default=None, type=str, help="half map 2"
 )
-mapmask.add_argument(
+halfmapmask.add_argument(
     "--maskname",
     required=False,
     default=None,
@@ -268,6 +274,12 @@ updatecell.add_argument(
 )
 
 
+def mapinfo(args):
+    # display map info
+    m1 = iotools.Map(args.mapname)
+    m1.read()
+
+
 def find_pg(args):
     # find pointgroup of the map
     _ = em.get_pointgroup(
@@ -286,15 +298,15 @@ def find_pg(args):
     )
 
 
-def make_mapmask(args):
+def make_halfmapmask(args):
     # generate density mask using halfmaps
     half1 = args.half1
     half2 = args.half2
 
-    if args.maskname is None:
-        maskname = "emdamapmask_1.mrc"
+    """ if args.maskname is None:
+        maskname = "emda_halfmapmask_1.mrc"
     else:
-        maskname = args.maskname
+        maskname = args.maskname """
 
     if half2 is None:
         try:
@@ -302,7 +314,8 @@ def make_mapmask(args):
         except NameError as e:
             print(e)
             print(
-                "Please make sure half1 name includes the string _half_map_1"
+                "Please make sure half1 name includes the string _half_map_1."
+                "\nOtherwise, please give half2 separately (--half2 xxx)"
             )
             raise SystemExit()
 
@@ -317,13 +330,20 @@ def make_mapmask(args):
     print("Genetating masks...")
     masklist = em.mask_from_halfmaps(h1, h2)
 
-    print("Outputting mask %s" % maskname)
-    maskname1 = maskname
-    mout = iotools.Map(name=maskname1)
-    mout.arr = masklist[0]
-    mout.cell = h1.workcell
-    mout.origin = h1.origin
-    mout.write()
+    for i, imask in enumerate(masklist):
+        maskname = "emda_halfmapmask_%s.mrc" % str(i + 1)
+        print("Outputting mask %s" % maskname)
+        mout = iotools.Map(name=maskname)
+        mout.arr = masklist[i]
+        mout.cell = h1.workcell
+        mout.origin = h1.origin
+        mout.write()
+        if i == 0 and args.maskname is not None:
+            try:
+                os.symlink(maskname, args.maskname)
+                print(f"Symbolic link created: {maskname} -> {args.maskname}")
+            except OSError as e:
+                print(f"Failed to create symbolic link: {e}")
 
 
 def calc_fsc(args):
@@ -464,10 +484,12 @@ def main(command_line=None):
     if args.command is None:
         emda_commands()
     else:
+        if args.command == "mapinfo":
+            mapinfo(args)        
         if args.command == "pointgroup":
             find_pg(args)
-        if args.command == "mapmask":
-            make_mapmask(args)
+        if args.command == "halfmapmask":
+            make_halfmapmask(args)
         if args.command == "fsc":
             calc_fsc(args)
         if args.command == "transform":
@@ -494,7 +516,7 @@ def emda_commands():
     print("---------------------------------")
     print("   pointgroup   - detect the point group symmetry of the map")
     print("   fsc          - computes FSC between two maps")
-    print("   mapmask      - generates a mask using halfmaps")
+    print("   halfmapmask      - generates a mask using halfmaps")
     print(
         "   transform    - apply a transformation on the map (Fourier space)"
     )
