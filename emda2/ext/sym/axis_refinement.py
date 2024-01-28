@@ -32,10 +32,6 @@ from math import cos, sin, sqrt, acos, atan2
 from timeit import default_timer as timer
 
 
-def vec2string(vec):
-    return " ".join(("% .3f" % x for x in vec))
-
-
 def combinestring(vec):
     return "-".join(("%.3f" % x for x in vec))
 
@@ -515,16 +511,6 @@ class Bfgs:
             )
 
         )
-        """ self.fobj.write(
-            "cycle=%i, fval=%.3f, afsc=%.3f, ax=%s, trans=%s\n"
-            % (
-                info["Nfeval"],
-                fval.real,
-                self.afsc,
-                vec2string(ax),
-                vec2string(t2),
-            )
-        ) """
         info["Nfeval"] += 1
         return -fval.real
 
@@ -743,7 +729,6 @@ def run_fit(
                         stmap = np.real(
                             ifftshift(ifftn(ifftshift(emmap1.fo_lst[0])))
                         )
-                        # stmap = np.real(ifftshift(ifftn(ifftshift(emmap1.eo_lst[0]))))
                         stm = iotools.Map("static_map.mrc")
                         stm.arr = stmap
                         stm.cell = emmap1.map_unit_cell
@@ -908,7 +893,7 @@ def prepare_data_using_halfmaps(
     from emda2.ext import mapmask
     import emda2.emda_methods2 as em
     from symanalysis_pipeline import writemap
-    from emda2.core import maptools
+    # from emda2.core import maptools
     import fcodes2
 
     if resol is not None:
