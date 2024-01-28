@@ -12,6 +12,7 @@ from __future__ import (
     print_function,
     unicode_literals,
 )
+import math
 import emda2.core as core
 from emda2.core import iotools, maptools
 import emda2.emda_methods2 as em
@@ -383,3 +384,32 @@ def rebox_using_model(imap, model):
 
 def vec2string(vec):
     return " ".join(("% .3f" % x for x in vec))
+
+
+def is_prime(n):
+    """
+    https://stackoverflow.com/questions/15285534/
+    isprime-function-for-python-language
+    """
+    if n == 2 or n == 3:
+        return True
+    if n < 2 or n % 2 == 0:
+        return False
+    if n < 9:
+        return True
+    if n % 3 == 0:
+        return False
+    r = int(n**0.5)
+    f = 5
+    while f <= r:
+        if n % f == 0:
+            return False
+        if n % (f + 2) == 0:
+            return False
+        f += 6
+    return True
+
+
+def normalise_axis(axis):
+    ax = np.asarray(axis, "float")
+    return ax / math.sqrt(np.dot(ax, ax))
