@@ -10,7 +10,7 @@ import math
 from emda2.ext.sym import axis_refinement
 from emda2.core import iotools, fsctools, quaternions
 import emda2.ext.utils as utils
-from numpy.fft import fftn, ifftn, fftshift, ifftshift
+from numpy.fft import fftn, fftshift
 import fcodes2
 import numpy as np
 import emda2.emda_methods2 as em
@@ -19,8 +19,8 @@ from emda2.ext.overlay import run_fit
 
 
 def get_rotation_center(m1, axis, order, claimed_res, mm):
-    results = []
-    nbin, res_arr, bin_idx, sgrid = em.get_binidx(cell=m1.workcell, arr=m1.workarr)
+    nbin, res_arr, bin_idx, sgrid = em.get_binidx(
+        cell=m1.workcell, arr=m1.workarr)
     if claimed_res < 5:
         resol4refinement = float(5)
     else:
@@ -35,13 +35,12 @@ def get_rotation_center(m1, axis, order, claimed_res, mm):
     # using COM
     nx, ny, nz = map1.shape
     com = utils.center_of_mass_density(map1)
-    #fobj.write('Centre of Mass [x, y, z] (pixel units) %s\n' %list(com))
     print("com:", com)
     box_centr = (nx // 2, ny // 2, nz // 2)
     map1_com_adjusted = utils.shift_density(map1, np.subtract(box_centr, com))
-    mask_com_adjusted = utils.shift_density(mm.workarr, np.subtract(box_centr, com))
-    #map1_com_adjusted = map1
-    #mask_com_adjusted = mm.workarr
+    mask_com_adjusted = utils.shift_density(
+        mm.workarr, np.subtract(box_centr, com)
+    )
     com = utils.center_of_mass_density(map1_com_adjusted)
     fo = fftshift(fftn(fftshift(map1_com_adjusted)))
     eo = fcodes2.get_normalized_sf_singlemap(
@@ -49,10 +48,10 @@ def get_rotation_center(m1, axis, order, claimed_res, mm):
         bin_idx=bin_idx,
         nbin=nbin,
         mode=0,
-        nx=nx,ny=ny,nz=nz,
+        nx=nx,
+        ny=ny,
+        nz=nz,
         )
-    #fsc_max = np.sqrt(filter_fsc(fsc_full))
-    #eo = eo * fcodes2.read_into_grid(bin_idx, fsc_max, nbin, nx, ny, nz)
     dist = np.sqrt((res_arr - claimed_res) ** 2)
     claimed_cbin = np.argmin(dist) + 1
     claimedres_data = [fo, bin_idx, claimed_res, nbin, res_arr, claimed_cbin]  
@@ -60,7 +59,7 @@ def get_rotation_center(m1, axis, order, claimed_res, mm):
     emmap1 = axis_refinement.EmmapOverlay(arr=map1_com_adjusted)
     emmap1.claimedres_data = claimedres_data
     emmap1.bin_idx = bin_idx
-    emmap1.mask = mask_com_adjusted#mm.workarr
+    emmap1.mask = mask_com_adjusted  # mm.workarr
     emmap1.res_arr = res_arr
     emmap1.nbin = nbin
     emmap1.pix = [m1.workcell[i]/sh for i, sh in enumerate(m1.workarr.shape)]
@@ -205,7 +204,7 @@ def refine_translation(emmap1, axis, order):
 
     eo = emmap1.eo_lst[0]
     fo = emmap1.fo_lst[0]
-    t = np.array([0., 0., 0.], 'float')
+    # t = np.array([0., 0., 0.], 'float')
     axis = np.asarray(axis)
     axis = axis / math.sqrt(np.dot(axis, axis))
     print('')
@@ -217,24 +216,14 @@ def refine_translation(emmap1, axis, order):
         angle = float(360 * j/order)
         print('angle: ', angle)
         q = quaternions.get_quaternion(list(axis), angle)
-        #rotmat = quaternions.get_RM(q)
-        #f_transformed = maptools.transform_f(
-        #                flist=[fo, eo],
-        #                axis=axis,
-        #                translation=t,
-        #                angle=angle
-        #                )
         f_transformed = rotate_f(
             rm=quaternions.get_RM(q), 
             f=np.stack([fo, eo], axis=-1), 
             bin_idx=emmap1.bin_idx, 
             ibin=emmap1.nbin)
-        emmap1.fo_lst = [fo, f_transformed[:,:,:,0]]
-        emmap1.eo_lst = [eo, f_transformed[:,:,:,1]]
-        # this is using emda overlay optimisation for translation
-        #emmap1.fo_lst = [fo, f_transformed[0]]
-        #emmap1.eo_lst = [eo, f_transformed[1]]
-        emmap1.map_origin = [0,0,0]
+        emmap1.fo_lst = [fo, f_transformed[:, :, :, 0]]
+        emmap1.eo_lst = [eo, f_transformed[:, :, :, 1]]
+        emmap1.map_origin = [0, 0, 0]
         emmap1.comlist = []
         emmap1.pixsize = emmap1.pix
         results = run_fit(
