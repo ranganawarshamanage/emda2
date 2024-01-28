@@ -1,21 +1,22 @@
-import numpy as np
+# Test code for emda weighted map
+
 import emda2.emda_methods2 as em
-from emda2.core import iotools, plotter
+from emda2.core import iotools
 import argparse
 
 
-parser = argparse.ArgumentParser(description='')
-parser.add_argument('--half1name', type=str, required=True, help='half1 file mrc/map')
-parser.add_argument('--half2name', type=str, required=True, help='half2 file mrc/map')
-#parser.add_argument('--maskname', type=str, required=False, default=None, help='mask file mrc/map')
+parser = argparse.ArgumentParser(
+    description='EMDA normalized and weighted map')
+parser.add_argument(
+    '--half1name', type=str, required=True, help='half1 file mrc/map')
+parser.add_argument(
+    '--half2name', type=str, required=True, help='half2 file mrc/map')
 args = parser.parse_args()
 
 h1 = iotools.Map(name=args.half1name)
 h1.read()
 h2 = iotools.Map(name=args.half2name)
 h2.read()
-#mm = iotools.Map(name=args.maskname)
-#mm.read()
 
 nbin, res_arr, bin_idx, _ = em.get_binidx(h1.cell, h1.workarr)
 weightedmap = em.emda_weightedmap(h1, h2, bin_idx, nbin, res_arr)
