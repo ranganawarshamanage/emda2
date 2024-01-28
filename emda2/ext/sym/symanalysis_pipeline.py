@@ -10,19 +10,18 @@ Mozilla Public License, version 2.0; see LICENSE.
 # Compute FSC-hf --> FSC-full
 # Compute FSC-sym from fullmap and sym.copy
 # Compare FSC-full vs FSC-sym
+
 import numpy as np
-import re, math, os
+import re
+import os
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
 from emda2.core import iotools, plotter, fsctools
 import emda2.emda_methods2 as em
 from emda2.ext.mapmask import mask_from_halfmaps
 from emda2.ext.sym import proshade_tools
 from emda2.ext.utils import (
-    get_ibin,
     filter_fsc,
-    shift_density,
     center_of_mass_density,
-    lowpassmap_butterworth,
 )
 import fcodes2
 from emda2.ext.sym import axis_refinement
@@ -33,6 +32,10 @@ from emda2.core import emdalogger
 from emda2.core.emdalogger import vec2string, list2string
 from emda2.ext.sym.decide_pointgroup import decide_pointgroup
 import emda2.ext.sym.average_symcopies as avgsym
+from emda2.ext.utils import (
+    is_prime,
+    normalise_axis,
+)
 
 
 def writemap(arr, cell, mapname, origin=None):
@@ -56,34 +59,6 @@ def _lowpassmap_butterworth(fclist, sgrid, smax):
     for fc in fclist:
         lw_fclist.append(fc * bwfilter)
     return lw_fclist
-
-
-def is_prime(n):
-    """
-    https://stackoverflow.com/questions/15285534/isprime-function-for-python-language
-    """
-    if n == 2 or n == 3:
-        return True
-    if n < 2 or n % 2 == 0:
-        return False
-    if n < 9:
-        return True
-    if n % 3 == 0:
-        return False
-    r = int(n**0.5)
-    f = 5
-    while f <= r:
-        if n % f == 0:
-            return False
-        if n % (f + 2) == 0:
-            return False
-        f += 6
-    return True
-
-
-def normalise_axis(axis):
-    ax = np.asarray(axis, "float")
-    return ax / math.sqrt(np.dot(ax, ax))
 
 
 def test(emmap1, axes, orders, fscs, fobj=None):
@@ -187,13 +162,10 @@ def test(emmap1, axes, orders, fscs, fobj=None):
         "Number of 3-fold axes: %s\n"
         "Number of 2-fold axes: %s\n"
         "Number of n-fold axes: %s\n"
-        # "\n        Detecting Pointgroup        \n"
-        # "======================================"
         % (len(sorder5ax), len(sorder3ax), len(sorder2ax), len(sordernax))
     )
     emdalogger.log_string(fobj, s)
-
-    print('Checking for cyclic orders...')
+    emdalogger.log_string(fobj, 'Checking for cyclic orders...')
     pg = pgcode.check_for_cyclic_only(
         emmap1=emmap1,
         axes=prime_axlist,
@@ -203,7 +175,7 @@ def test(emmap1, axes, orders, fscs, fobj=None):
     )
     if pg is not None:
         return pg
-    print("More than one axis.")
+
     pg = "C1"
     if len(sorder5ax) > 0:
         axes = [sorder5ax, sorder3ax, sorder2ax, sordernax]
@@ -247,7 +219,6 @@ def get_pg(dict, fobj):
     bin_idx = dict["bin_idx"]
     nbin = dict["nbin"]
     sgrid = dict["sgrid"]
-    # fobj = kwargs["fobj"]
     mask = dict["rmask"]
     half1 = dict["rmap1"]
     half2 = dict["rmap2"]
@@ -429,22 +400,32 @@ def get_pg(dict, fobj):
             fold, axis = row[0], row[1]
             folds.append(fold[0])
             axes.append(axis)
-        print()
-        print("****** Pointgroup at different resolutions ******")
-        fobj.write("****** Pointgroup at different resolutions ******\n")
+
+        emdalogger.log_string(
+            fobj, "****** Pointgroup at different resolutions ******")
+
         levels = [0.95, 0.90, 0.85, 0.80]
+
         pglevels = []
         for level in levels:
             pglevels.append(get_pg_perlevel(a, axes, folds, level))
-        print("  Resol.  pg@lvls= [ 0.95,  0.90,  0.85  0.80 ]")
-        fobj.write(" Resol.  pg@lvls= [ 0.95,  0.90,  0.85  0.80 ]\n")
+
+        emdalogger.log_string(
+            fobj,
+            " Resol.  pg@lvls= [ 0.95,  0.90,  0.85  0.80 ]"
+        )
+
         for i, res in enumerate(res_arr):
             ll = [pglevels[n][i] for n in range(len(pglevels))]
-            print(res, list2string(ll))
-            fobj.write(" %.2f  %s\n" % (res, list2string(ll)))
+            emdalogger.log_string(
+                fobj,
+                " %.2f  %s" % (res, list2string(ll))
+            )
             if i == emmap1.claimed_bin:
-                print(dash)
-                fobj.write(dash + "\n")
+                emdalogger.log_string(
+                    fobj,
+                    dash
+                )
 
         # average symcopies
         if symaverage:
@@ -512,9 +493,8 @@ def get_pg(dict, fobj):
                         + " Order: "
                         + str(folds[i])
                     )
-                    print(string1)
-                print(dash)
-                fobj.write(dash + "\n")
+                    emdalogger.log_string(fobj, string1)
+                emdalogger.log_string(fobj, dash)
                 line1 = (
                     "  res  | "
                     + " " * ((m - 4) // 2)
@@ -522,25 +502,18 @@ def get_pg(dict, fobj):
                     + " " * ((m - 4) // 2)
                     + " |  FSCh "
                 )
-                print(line1)
-                fobj.write(line1 + "\n")
-                print(dash)
-                fobj.write(dash + "\n")
+                emdalogger.log_string(fobj, line1)
+                emdalogger.log_string(fobj, dash)
                 for i, res in enumerate(emmap1.res_arr):
-                    print(
-                        "{:>6.2f} | {} | {:>6.3f}".format(
-                            res, vec2string(b[:, i]), fsc_hf[i]
-                        )
-                    )
-                    fobj.write(
+                    emdalogger.log_string(
+                        fobj,
                         "{:>6.2f} | {} | {:>6.3f}\n".format(
                             res, vec2string(b[:, i]), fsc_hf[i]
                         )
                     )
                     if i == emmap1.claimed_bin:
-                        print(dash)
-                        fobj.write(dash + "\n")
-                fobj.write(dash + "\n")
+                        emdalogger.log_string(fobj, dash)
+                emdalogger.log_string(fobj, dash)
                 print("Plotting FSCs...")
                 # plotting FSCs
                 labels = ["hf1-hf2"]
@@ -558,15 +531,12 @@ def get_pg(dict, fobj):
                     plot_title="FSC between half maps",
                 )
             else:
-                print(
-                    "---- None of the axis has FSC_sym >= %s @ %.2f A"
-                    % (pg_decide_fsc, emmap1.claimed_res)
-                )
-                fobj.write(
+                emdalogger.log_string(
+                    fobj,
                     "---- None of the axis has FSC_sym >= %s @ %.2f A\n"
                     % (pg_decide_fsc, emmap1.claimed_res)
                 )
-                fobj.write(dash + "\n")
+                emdalogger.log_string(fobj, dash)
     return pg
 
 
@@ -608,7 +578,6 @@ def main(dict, fobj=None):
     logname = "emd-%s-pointgroup.txt" % label
     emdbid = "emd-%s" % label
     maskname = "emda_mapmask_emd-%s.mrc" % label
-    # reboxedmaskname = "emda_rbxmapmask_emd-%s.mrc" % label
     reboxedmapname = "emda_rbxfullmap_emd-%s.mrc" % label
     dict["emdbid"] = emdbid
 
@@ -678,7 +647,6 @@ def main(dict, fobj=None):
         writemap(fullmap, newcell, reboxedmapname)
         dict["reboxedmapname"] = reboxedmapname
         # run proshade
-        print("Running Proshade...")
         results = proshade_tools.get_symmops_from_proshade(
             mapname=reboxedmapname, fobj=fobj
         )
@@ -704,7 +672,7 @@ def main(dict, fobj=None):
 
 
 def switch(dict):
-    print(dict)
+    # print(dict)
     if (os.path.isfile(dict["half1"])):
         return main(dict, fobj=None)
     if (os.path.isfile(dict["pmap"])):
