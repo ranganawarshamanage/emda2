@@ -7,7 +7,7 @@ import argparse, os
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--mapname', type=str, required=True, help='map file mrc/map')
 parser.add_argument('--lowpass_resolution', type=float, required=True, help='Specify lowpass resolution')
-parser.add_argument('--outputmapname', type=str, default=None, required=False, help='outputmap name mrc/map')
+parser.add_argument('--outputmapname', type=str, default="", required=False, help='outputmap name mrc/map')
 #parser.add_argument('--binfactor', type=float, required=True, help='Specify the bin factor')
 args = parser.parse_args()
 
@@ -18,7 +18,7 @@ m1.read()
 _, lwp = em.lowpass_map(
     uc=m1.workcell, arr1=m1.workarr, resol=args.lowpass_resolution, filter="butterworth")
 
-if args.outputmapname is None:
+if not args.outputmapname:
     basename = os.path.basename(args.mapname)
     outputmapname = basename[:-4] + "_emda_lowpass_%dA.mrc" % args.lowpass_resolution
 
