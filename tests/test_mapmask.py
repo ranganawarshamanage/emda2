@@ -5,7 +5,7 @@ import argparse
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--mapname', type=str, required=True, help='map file mrc/map')
 parser.add_argument('--binary_threshold', type=float, required=True, help='binary threshold to use')
-#parser.add_argument('--binfactor', type=float, required=True, help='Specify the bin factor')
+parser.add_argument('--maskname', type=str, required=False, default="emda_mapmask.mrc", help='Specify the bin factor')
 args = parser.parse_args()
 
 
@@ -16,7 +16,7 @@ print(m1.arr.shape)
 
 masklist = em.mask_from_map_connectedpixels(m1, binthresh=args.binary_threshold)
 
-m2 = iotools.Map(name='newmap.mrc')
+m2 = iotools.Map(name=args.maskname)
 m2.arr = masklist[0]
 m2.cell = m1.cell
 m2.origin = m1.origin
