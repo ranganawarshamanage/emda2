@@ -273,6 +273,47 @@ updatecell.add_argument(
     help="name for the cell updated map. default to updatedmap.mrc",
 )
 
+# Simulate EM map from atomic model
+model2map = subparsers.add_parser(
+    "model2map", description="simulate EM map from atomic model"
+)
+model2map.add_argument(
+    '--atomic_model', 
+    type=str, 
+    required=True, 
+    help='pdb/mmcif file mrc/map'
+)
+model2map.add_argument(
+    "--cell",
+    required=False,
+    nargs="+",
+    type=float,
+    default=None,
+    help="input newcell in the format a b c",
+)
+model2map.add_argument(
+    '--pixel_size', 
+    type=float, 
+    required=True, 
+    help='Specify pixel size in A'
+)
+model2map.add_argument(
+    '--pad', 
+    type=int, 
+    required=False,
+    default=0, 
+    help='Specify number of pixels as padding. This number of pixels will be added in all dims'
+)
+model2map.add_argument(
+    '--outputmapname', 
+    type=str, 
+    default=None, 
+    required=False, 
+    help='outputmap name mrc/map'
+)
+
+
+
 
 def mapinfo(args):
     # display map info
@@ -477,6 +518,29 @@ def update_cell(args):
     m2.write()
 
 
+def simulate_emmap(args):
+    # REFMAC sfcalc
+    modelmap, cell = em.model2map_refmac(
+        modelxyz=args.atomic_model,
+        pad=args.pad,
+        pix_size=args.pixel_size,
+        cell=args.cell,
+        # maporigin=m1.origin,
+        # lig=args.lig,
+        # ligfile=args.lgf,
+        # shift_to_boxcenter=args.shift_to_boxcenter,
+    )
+    if args.outputmapname is None:
+        modelmapname = "emda_modelmap.mrc"
+    else:
+        modelmapname = args.outputmapname
+    m2 = iotools.Map(name=modelmapname)
+    m2.cell = cell
+    m2.arr = modelmap
+    m2.origin = [0, 0, 0]
+    m2.write()
+
+
 def main(command_line=None):
     # f = open("EMDA.txt", "w")
     # f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
@@ -500,6 +564,8 @@ def main(command_line=None):
             rebox_map(args)
         if args.command == "updatecell":
             update_cell(args)
+        if args.command == "model2map":
+            simulate_emmap(args)
 
 
 def emda_commands():
@@ -523,6 +589,7 @@ def emda_commands():
     print("   rotatemap    - apply a rotation on the map (Real space)")
     print("   rebox        - rebox a map based on a mask")
     print("   updatecell   - update the cell")
+    print("   model2map    - simulate EM map from atomic model")
     # print('   info      - output basic information about the map')
 
     # print('   halffsc   - computes FSC between half maps')

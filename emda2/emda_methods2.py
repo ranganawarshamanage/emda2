@@ -960,6 +960,186 @@ def emda_weightedmap(h1, h2, bin_idx, nbin, res_arr, B=None):
     return np.real(np.fft.ifftn(np.fft.ifftshift(weightedmap)))
 
 
+def model2map_refmac(
+    modelxyz, pix_size, pad, cell=None, bfac=None, maporigin=None, ligfile=None, outputpath=None, shift_to_boxcenter=False,
+):
+    """Calculates EM map from atomic coordinates using REFMAC5
+
+    Args:
+        modelxyz (string): Name of the coordinate file (.cif/.pdb)
+        dim (list): Map dimensions [nx, ny, nz] as a list of integers
+        resol (float): Requested resolution for density calculation in Angstroms.
+        cell (list): Cell parameters a, b and c as floats
+        maporigin (list, optional): Location of the first column (nxstart), 
+            row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
+        ligfile (string, optional): Name of the ligand description file. Defaults to None.
+        outputpath (string, optional): Path for auxilliary files. Defaults to current
+            working directory.
+        bfac(float, optional): Parameter for refmac. Set all atomic B values to bfac
+            when it is positive. Default to None.
+        shift_to_boxcenter (bool, optional): This parameter is useful if the calculated
+            map from the model needs to be placed at the center of the box. Default to
+            False. Also, the shifted model will be written to outputpath directory.
+
+    Returns:
+        float ndarray: calculated model-based density array
+    """
+    import gemmi as gm
+    import shutil
+
+    resol = float(2 * pix_size)
+
+    if cell is None:
+        from emda2.core.modeltools import cell_from_model
+        cell = cell_from_model(modelxyz)
+        cell = [max(cell), max(cell), max(cell)] # cubic
+
+    # print parameters
+    print('Nyquist resolution (A): ', resol)
+    # print('Requested dimensions: ', dim)
+    # print('Cell [a, b, c]: ', cell)
+    if outputpath is None:
+        outputpath = os.getcwd()
+    outputpath = os.path.join(outputpath, 'emda_refmacfiles/')
+    # print('outputpath: ', outputpath)
+    # make director for files for refmac run
+    if os.path.exists(outputpath):
+        shutil.rmtree(outputpath)
+    os.mkdir(outputpath) 
+
+    # check for minimum sampling
+    min_dim = np.asarray(cell[:3], dtype="float") / pix_size
+    min_dim = np.ceil(min_dim).astype(int) + int(pad)
+
+    dim = [x if x % 2 == 0 else x + 1 for x in min_dim]
+
+    # for i in range(3):
+    #     if min_dim[i] % 2 != 0:
+    #         min_dim += 1
+    #     if min_dim[0] > dim[0]:
+    #         print("Requested dims: ", dim)
+    #         print("Minimum dims needed (for requested resolution): ", min_dim)
+    #         print("!!! Please lower the requested resolution or increase the grid dimensions !!!")
+    #         raise SystemExit()
+    # replace/add cell and write model.cif
+    # if shift_to_boxcenter:
+    #     from emda.core.modeltools import shift_to_origin,shift_model
+    #     doc = shift_to_origin(modelxyz)
+    #     doc.write_file(outputpath+"model1.cif")
+    #     modelxyz = outputpath+"model1.cif"
+    # run refmac using model.cif just created
+    if cell is not None:
+        a, b, c = cell[:3]
+    else:
+        print("find from atomic model coords.")
+    structure = gm.read_structure(modelxyz)
+    structure.cell.set(a, b, c, 90.0, 90.0, 90.0)
+    structure.spacegroup_hm = "P 1"
+    structure.make_mmcif_document().write_file(outputpath+"model.cif")
+    # run refmac using model.cif just created
+    iotools.run_refmac_sfcalc(filename=outputpath+"model.cif", 
+                              resol=resol, 
+                              ligfile=ligfile,
+                              bfac=bfac)
+    modelmap, uc = maptools.mtz2map(outputpath+"sfcalc_from_crd.mtz", dim)
+    # print(modelmap.shape)
+    # if shift_to_boxcenter:
+    #     maporigin = None # no origin shift allowed
+    #     modelmap = np.fft.fftshift(modelmap) #bring modelmap to boxcenter
+    #     # shift model to boxcenter
+    #     doc = shift_model(mmcif_file=outputpath+"model.cif", shift=[a/2, b/2, c/2])
+    #     doc.write_file(outputpath+"emda_shifted_model.cif")
+    """ if maporigin is None:
+        maporigin = [0, 0, 0]
+    else:
+        shift_z = maporigin[0]
+        shift_y = maporigin[1]
+        shift_x = maporigin[2]
+        modelmap = np.roll(
+            np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
+            -shift_x,
+            axis=2,
+        ) """
+    return modelmap, uc
+
+
+def model2map_gm(
+    modelxyz, 
+    resol, 
+    dim, 
+    cell, 
+    maporigin=None, 
+    outputpath=None, 
+    shift_to_boxcenter=False
+):
+    import gemmi, shutil
+    from servalcat.utils.model import calc_fc_fft
+
+    if outputpath is None:
+        outputpath = os.getcwd()
+    outputpath = os.path.join(outputpath, 'emda_gemmifiles/')
+    print('outputpath: ', outputpath)
+    if os.path.exists(outputpath):
+        shutil.rmtree(outputpath)
+    os.mkdir(outputpath) 
+    # check for valid sampling:
+    for i in range(3):
+        if dim[i] % 2 != 0:
+            dim[i] += 1
+    # check for minimum sampling
+    min_pix_size = resol / 2  # in Angstrom
+    min_dim = np.asarray(cell[:3], dtype="float") / min_pix_size
+    min_dim = np.ceil(min_dim).astype(int)
+    for i in range(3):
+        if min_dim[i] % 2 != 0:
+            min_dim += 1
+        if min_dim[0] > dim[0]:
+            print("Requested dims: ", dim)
+            print("Minimum dims needed (for requested resolution): ", min_dim)
+            print("!!! Please lower the requested resolution or increase the grid dimensions !!!")
+            raise SystemExit()
+    # if shift_to_boxcenter:
+    #     from emda.core.modeltools import shift_to_origin,shift_model
+    #     doc = shift_to_origin(modelxyz)
+    #     doc.write_file(outputpath+"model1.cif")
+    #     modelxyz = outputpath+"model1.cif"
+    a, b, c = cell[:3]
+    st = gemmi.read_structure(modelxyz)
+    st.spacegroup_hm = "P 1"
+    st.cell.set(a, b, c, 90., 90., 90.)
+    st.make_mmcif_document().write_file(outputpath+"model.cif")
+    asu_data = calc_fc_fft(st=st, 
+                           d_min=resol, 
+                           source='electron', 
+                           mott_bethe=True)
+    griddata = asu_data.get_f_phi_on_grid(dim)
+    griddata_np = (np.array(griddata, copy=False)).transpose()
+    modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
+    if np.sum(np.asarray(modelmap.shape, 'int') - np.asarray(dim, 'int')) != 0:
+        cpix = [cell[i]/shape for i, shape in enumerate(modelmap.shape)]
+        tpix = [cell[i]/shape for i, shape in enumerate(dim)]
+        modelmap = em.resample_data(
+            curnt_pix=cpix, targt_pix=tpix, arr=modelmap, targt_dim=dim)
+    # if shift_to_boxcenter:
+    #     maporigin = None # no origin shift allowed
+    #     modelmap = np.fft.fftshift(modelmap) #bring modelmap to boxcenter
+    #     # shift model to boxcenter
+    #     doc = shift_model(mmcif_file=outputpath+"model.cif", shift=[a/2, b/2, c/2])
+    #     doc.write_file(outputpath+"emda_shifted_model.cif")
+    if maporigin is None:
+        maporigin = [0, 0, 0]
+    else:
+        shift_z = maporigin[0]
+        shift_y = maporigin[1]
+        shift_x = maporigin[2]
+        modelmap = np.roll(
+            np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
+            -shift_x,
+            axis=2,
+        )
+    return modelmap
+
+
 """ def symmetry_average_map(mlist, axlist, folds, rot_centre=None):
     from emda2.ext.sym.average_symcopies import average
     if rot_centre is None:

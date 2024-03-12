@@ -71,3 +71,32 @@ def model_rebox(mask, mmcif_file, padwidth=10, uc=None):
         os.remove("./out.cif")
     if os.path.isfile("tmp.cif"):
         os.remove("./tmp.cif")
+
+
+def cell_from_model(infile):
+    if infile.endswith(".pdb"):
+        pdb2mmcif(infile)
+        infile = "out.cif"
+    doc = gemmi.cif.read_file(infile)
+    block = doc.sole_block()  # cif file as a single block
+    col_x = block.find_values("_atom_site.Cartn_x")
+    col_y = block.find_values("_atom_site.Cartn_y")
+    col_z = block.find_values("_atom_site.Cartn_z")
+
+    coord_x = np.array(col_x, dtype="float")
+    coord_y = np.array(col_y, dtype="float")
+    coord_z = np.array(col_z, dtype="float")
+
+    x_min = np.amin(coord_x)
+    y_min = np.amin(coord_y)
+    z_min = np.amin(coord_z)
+    
+    x_max = np.amax(coord_x)
+    y_max = np.amax(coord_y)
+    z_max = np.amax(coord_z)
+
+    dim_x = x_max - x_min
+    dim_y = y_max - y_min
+    dim_z = z_max - z_min
+
+    return [dim_x, dim_y, dim_z]
