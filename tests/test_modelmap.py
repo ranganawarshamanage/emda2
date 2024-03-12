@@ -1,7 +1,7 @@
 # Simulate map fron atomic model
 
 import numpy as np
-import emda2.emda_methods2 as em
+from emda2 import emda_methods2 as em
 from emda2.core import iotools, maptools
 import argparse, os
 
@@ -176,7 +176,7 @@ def model2map_refmac(
     #     # shift model to boxcenter
     #     doc = shift_model(mmcif_file=outputpath+"model.cif", shift=[a/2, b/2, c/2])
     #     doc.write_file(outputpath+"emda_shifted_model.cif")
-    """ if maporigin is None:
+    if maporigin is None:
         maporigin = [0, 0, 0]
     else:
         shift_z = maporigin[0]
@@ -186,7 +186,7 @@ def model2map_refmac(
             np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
             -shift_x,
             axis=2,
-        ) """
+        )
     return modelmap
 
 
