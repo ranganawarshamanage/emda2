@@ -1060,6 +1060,7 @@ def model2map_refmac(
             -shift_x,
             axis=2,
         ) """
+    uc = [x * pix_size for x in dim]
     return modelmap, uc
 
 
