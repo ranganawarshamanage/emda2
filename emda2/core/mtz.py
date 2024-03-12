@@ -65,7 +65,7 @@ class Mtz:
     def to_f1d(self):
         if self.amplitudes is None:
             self.read()
-        self.f1d = self.amplitudes * np.exp(np.pi * 1j * self.phase / 180.0)
+        self.f1d = self.amplitudes * np.exp(-np.pi * 1j * self.phase / 180.0)
 
     def to_f3d(self, mapsize=None):
         if self.f1d is None:
