@@ -1042,6 +1042,7 @@ def model2map_refmac(
                               ligfile=ligfile,
                               bfac=bfac)
     modelmap, uc = maptools.mtz2map(outputpath+"sfcalc_from_crd.mtz", dim)
+    modelmap = np.fft.fftshift(modelmap)
     # print(modelmap.shape)
     # if shift_to_boxcenter:
     #     maporigin = None # no origin shift allowed
