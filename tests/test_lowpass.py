@@ -21,8 +21,10 @@ _, lwp = em.lowpass_map(
 if not args.outputmapname:
     basename = os.path.basename(args.mapname)
     outputmapname = basename[:-4] + "_emda_lowpass_%dA.mrc" % args.lowpass_resolution
+else:
+    outputmapname = args.outputmapname
 
-m2 = iotools.Map(name=args.outputmapname)
+m2 = iotools.Map(name=outputmapname)
 croppedImage = iotools.cropimage(arr=lwp, tdim=m1.arr.shape)
 m2.cell = m1.cell
 m2.arr = croppedImage
