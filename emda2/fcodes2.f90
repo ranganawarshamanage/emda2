@@ -317,19 +317,17 @@ subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_i
    if(debug) print*, 'time for calculation(s) = ', finish-start
 end subroutine resolution_grid_from_given_resarr
 
-subroutine make_resarr(uc,maxbin,res_arr,nbin,firststep)
+subroutine make_resarr(uc,maxbin,res_arr,firststep)
   implicit none
   integer, intent(in) :: maxbin
   real, dimension(6),intent(in) :: uc
   real, intent(in),optional :: firststep
   real, dimension(0:maxbin-1),intent(out) :: res_arr
-  integer, intent(out) :: nbin
   ! locals
   integer :: i
   real :: fstep, step, resol
 
   res_arr = 0.0
-  print*, 'first step: ', firststep
   ! current F2PY do not handle fortran optional arguments properly
   ! optional args are always present
   if(present(firststep))then
@@ -339,13 +337,10 @@ subroutine make_resarr(uc,maxbin,res_arr,nbin,firststep)
         fstep = firststep
      end if
   end if
-  print*, 'fstep: ', fstep
   do i = 0, maxbin-2 ! ignore last line
      step = (i + fstep)
      call get_resol(uc,step,0.0,0.0,resol)
-     print*, i,step,resol
      res_arr(i) = resol
-     nbin = i + 1
   end do
   return
 end subroutine make_resarr
@@ -2806,19 +2801,22 @@ subroutine numberic_derivatives(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,DFRS)
   real*8,intent(in):: RM(ncopies,3,3)
   integer,   dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: bin_idx
   complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
-  complex*16,dimension(2,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: DFRS
+  complex*16,dimension(ncopies/2,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: DFRS
   !local
-  complex*16,dimension(4,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2):: FRS
+  complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2):: FRS
   real :: start,finish
+  integer :: nmaps, i
   
   FRS = dcmplx(0.0d0, 0.0d0)
   DFRS = dcmplx(0.0d0, 0.0d0)
+  nmaps = ncopies / 2
   call cpu_time(start)
   ! calling interpolation
   call trilinear_nrotmat(F,bin_idx,RM,ncopies,mode,nx,ny,nz,ibin,FRS)
   ! numerical derivative calculation
-  DFRS(1,:,:,:) = FRS(1,:,:,:) - FRS(2,:,:,:)
-  DFRS(2,:,:,:) = FRS(3,:,:,:) - FRS(4,:,:,:)
+  do i = 1, nmaps
+      DFRS(i,:,:,:) = FRS(2*i-1,:,:,:) - FRS(2*i,:,:,:)
+  end do
   call cpu_time(finish)
   !print*, 'time for derivative calculation (s) = ', finish-start
   return
@@ -2863,7 +2861,7 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
   integer :: h,k,l,i
   integer :: xmin,xmax,ymin,ymax,zmin,zmax
 
-  print*, 'Trilinear interpolation in real space...'
+  ! print*, 'Trilinear interpolation in real space...'
 
   debug = .FALSE.
   if(mode == 1) debug = .TRUE.

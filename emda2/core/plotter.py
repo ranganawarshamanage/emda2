@@ -44,8 +44,7 @@ def plot_line_log(res_arr, arr):
 def plot_nlines_log(
     res_arr,
     list_arr,
-    # curve_label=["Signal","Noise","Predicted"],
-    curve_label=None,
+    labels=None,
     mapname=None,
     plot_title=None,
     xlabel="Resolution ($\AA$)",
@@ -58,12 +57,12 @@ def plot_nlines_log(
     ax1 = fig.add_subplot(111)
     for icurve in range(len(list_arr)):
         data = list_arr[icurve]
-        if curve_label is None:
+        if labels is None:
             label = "Set#" + str(icurve)
             ax1.plot(bin_arr, np.log10(data), label=label, linewidth=2)
         else:
             ax1.plot(
-                bin_arr, np.log10(data), label=curve_label[icurve], linewidth=2
+                bin_arr, np.log10(data), label=labels[icurve], linewidth=2
             )
     pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]

@@ -6,6 +6,7 @@ This software is released under the
 Mozilla Public License, version 2.0; see LICENSE.
 """
 from __future__ import absolute_import, division, print_function
+import warnings
 import numpy as np
 import argparse
 import re
@@ -22,6 +23,22 @@ from emda2.core import (
 )
 from numpy.fft import ifftshift, ifftn
 import emda2.emda_methods2 as em
+
+
+class RequiredIfMissing(argparse.Action):
+    def __init__(self, option_strings, dest, required_args=None, **kwargs):
+        self.required_args = required_args or []
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Set the value of the current argument
+        setattr(namespace, self.dest, values)
+
+        # Check if any of the required arguments are provided
+        missing = all(getattr(namespace, arg, None) is None for arg in self.required_args)
+
+        if missing:
+            parser.error(f"One of the arguments '{', '.join(self.required_args)}' is required when '{self.dest}' is not provided.")
 
 
 # print('EMDA COMMAND LINE OPTIONS \n')
@@ -267,6 +284,105 @@ updatecell.add_argument(
     help="name for the cell updated map. default to updatedmap.mrc",
 )
 
+# modelmap calculation
+model2map = subparsers.add_parser(
+    "model2map", description="Simulate EM map from atomic model (PDB/mmCIF)"
+)
+model2map.add_argument(
+    "--atomic_crdfile",
+    required=True,
+    type=str,
+    help="Name of the atomic coordinate file (PDB/mmCIF)"
+)
+model2map.add_argument(
+    "--resolution",
+    required=True,
+    type=float,
+    help="Resolution of the calculated map in Angstroms"
+)
+model2map.add_argument(
+    "--pixel_size",
+    required=False,
+    type=float,
+    help="Desired pixel size of the calculated map in Angstroms"
+)
+model2map.add_argument(
+    "--pad",
+    required=False,
+    default=10,
+    type=int,
+    help="Number of pixels to pad with (default=10)"
+)
+model2map.add_argument(
+    "--shift_to_boxcenter",
+    required=False,
+    action="store_true",
+    help="If use, the model is centered in the box before the map calculation"
+)
+model2map.add_argument(
+    "--output_crdfile",
+    required=False,
+    type=str,
+    default="model_for_map_calculation.cif",
+    help="Name of the output coordinate file (mmCIF)"
+)
+model2map.add_argument(
+    "--density_calculator",
+    required=False,
+    type=str,
+    default="gemmi",
+    help="Name of the density calculator (gemmi(D) | refmac)"
+)
+model2map.add_argument(
+    "--bfactor",
+    required=False,
+    type=float,
+    default=None,
+    help="B-factor for all atoms. Default=None i.e: B-factors in the model will be used."
+)
+model2map.add_argument(
+    "--cell",
+    # action=RequiredIfMissing, 
+    # required_args=['reference_map'],
+    nargs="+",
+    type=float,
+    default=None,
+    help=(
+        # "Cell is required if reference_map is missing. "
+        "It should be given as a list. e.g. --cell a b c alpha beta gamma"
+    )
+)
+model2map.add_argument(
+    "--dims",
+    # action=RequiredIfMissing, 
+    # required_args=['reference_map'],
+    nargs="+",
+    type=int,
+    default=None,
+    help=(
+        # "Dimensions are required if reference_map is missing. "
+        "It should be given as a list. e.g. --dims 100 100 100"
+    )
+)
+model2map.add_argument(
+    "--reference_map",
+    required=False,
+    type=str,
+    default=None,
+    help=(
+        "Name of the EM map to use as the reference for cell and dims. "
+        "if the reference_map is missing the cell and the dims must be "
+        "specified manually.")
+)
+model2map.add_argument(
+    "--modelmapname",
+    required=False,
+    type=str,
+    default="emda_modelmap",
+    help=(
+        "Output the calculated map by this name")
+)
+
 
 def find_pg(args):
     # find pointgroup of the map
@@ -457,6 +573,74 @@ def update_cell(args):
     m2.write()
 
 
+def model2map(args):
+    input_crdfile = args.atomic_crdfile
+    angpix = args.pixel_size
+    pad = args.pad
+    shift_to_boxcenter = args.shift_to_boxcenter
+    output_crdfile = args.output_crdfile
+    density_calculator = args.density_calculator
+    bfactor = args.bfactor
+    cell = args.cell
+    dims = args.dims
+    output_density_file = args.modelmapname
+    reference_map = args.reference_map
+    resolution = args.resolution
+
+    if reference_map:
+        mref = iotools.Map(reference_map)
+        mref.read()
+
+        angpix = min([mref.workcell[i] / mref.workarr.shape[i] for i in range(3)])
+        warnings.warn(f"Provided pixel size will be overwritten with {angpix} A/pix")
+        cell = mref.workcell
+        dims = mref.workarr.shape
+
+    if cell and dims:
+        angpix = cell[0] / dims[0]
+
+    if angpix is None:
+        angpix = resolution / 2
+
+    print("===== INPUT PARAMETERS =====")
+    # Printing parameters
+    print(f"Input coordinate file: {input_crdfile}")
+    print(f"Resolution: {resolution}")
+    print(f"Pixel size: {angpix}")
+    print(f"Shift the model to box center: {shift_to_boxcenter}")
+    print(f"Pad: {pad}")
+    print(f"Cell: {cell}")
+    if dims is None:
+        print("Dimensions are not given. They will be calculated automatically")
+    else:
+        print(f"Dimensions: {dims}")
+    print(f"Density calculator: {density_calculator}")
+    if bfactor is None:
+        print("Atomic B-factors will be used.")
+    else:
+        print(f"Set all atomic Bfactors to: {bfactor}")
+    if reference_map:
+        print(f"Reference map: {reference_map}")
+    print(f"Output coordinates file: {output_crdfile}")
+    print(f"Output calculated map: {output_density_file}.mrc")
+    print("============================")
+
+    modelmap, cell = em.model2map(
+        input_crdfile=input_crdfile, resolution=resolution, pad=pad, 
+        shift_to_boxcenter=shift_to_boxcenter, 
+        output_crdfile=output_crdfile, 
+        density_calculator=density_calculator, 
+        bfactor=bfactor, cell=cell, dims=dims, angpix=angpix)
+
+    mout = iotools.Map(f"{output_density_file}.mrc")
+    mout.cell = cell
+    mout.arr = modelmap
+    mout.write()
+
+    print("Calculated map was successfully written.")
+
+
+
 def main(command_line=None):
     # f = open("EMDA.txt", "w")
     # f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
@@ -478,6 +662,8 @@ def main(command_line=None):
             rebox_map(args)
         if args.command == "updatecell":
             update_cell(args)
+        if args.command == "model2map":
+            model2map(args)
 
 
 def emda_commands():
@@ -501,6 +687,7 @@ def emda_commands():
     print("   rotatemap    - apply a rotation on the map (Real space)")
     print("   rebox        - rebox a map based on a mask")
     print("   updatecell   - update the cell")
+    print('   model2map    - computes a map from the atomic model')
     # print('   info      - output basic information about the map')
 
     # print('   halffsc   - computes FSC between half maps')
@@ -526,7 +713,7 @@ def emda_commands():
     # print('   predfsc   - predicts FSCs based on number of particles and B-factor')
     # print('   occ       - computes overall correlation coefficient (mean correacted)')
     # print('   mirror    - changes the handedness of map')
-    # print('   model2map - computes a map from the atomic model')
+    
     # print('   mapmask   - generates a mask from the map')
     # print('   composite - generates composite maps from several maps')
     # print('   resamplemap2map - resample one map on another map')

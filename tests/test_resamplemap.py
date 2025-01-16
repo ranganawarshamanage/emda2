@@ -13,7 +13,7 @@ mapobj1 = iotools.Map(name=args.mapname)
 mapobj1.read()
 
 if args.target_dim is None:
-    target_dim = list(mapobj1.shape)
+    target_dim = list(mapobj1.workarr.shape)
 else:
     target_dim = args.target_dim
 

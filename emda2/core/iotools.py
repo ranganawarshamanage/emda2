@@ -43,14 +43,24 @@ class Map:
                 file.header.maps - 1,
             )
             self.axorder = axorder
-            # print('order: ', order)
             axes_order = "".join(["XYZ"[i] for i in axorder])
-            print("Axes order: ", axes_order)
-            self.arr = np.moveaxis(
-                a=np.asarray(file.data, dtype="float"),
-                source=(2, 1, 0),
-                destination=axorder,
-            )
+            
+            if len(axorder) == len(set(axorder)):
+                self.arr = np.moveaxis(
+                    a=np.asarray(file.data, dtype="float"),
+                    source=(2, 1, 0),
+                    destination=axorder,
+                )
+            else:
+                print(" !!! Axes order of the map is unusual !!! ")
+                print("Map reading assumes the correct axes order is XYZ")
+                # axorder hardcoded to (0, 1, 2)
+                self.arr = np.moveaxis(
+                    a=np.asarray(file.data, dtype="float"),
+                    source=(2, 1, 0),
+                    destination=(0, 1, 2),
+                )
+
             unit_cell = np.zeros(6, dtype="float")
             cell = file.header.cella[["x", "y", "z"]]
             unit_cell[:3] = cell.astype(
@@ -348,47 +358,6 @@ def read_mmcif(mmcif_file):
     Biso_np = np.array(col_Biso, dtype="float", copy=False)
     return cell, x_np, y_np, z_np, Biso_np
 
-
-def run_refmac_sfcalc(filename, resol, lig=True, bfac=None, ligfile=None):
-    import os
-    import os.path
-    import subprocess
-
-    #
-    current_path = os.getcwd()  # get current path
-    filepath = os.path.abspath(os.path.dirname(filename)) + "/"
-    os.chdir(filepath)
-    fmtz = filename[:-4] + ".mtz"
-    cmd = ["refmac5", "XYZIN", filename, "HKLOUT", fmtz]
-    if ligfile is not None:
-        cmd = ["refmac5", "XYZIN", filename, "HKLOUT", fmtz, "lib_in", ligfile]
-        lig = False
-    # Creating the sfcalc.inp with custom parameters (resol, Bfac)
-    sfcalc_inp = open(filepath + "sfcalc.inp", "w+")
-    sfcalc_inp.write("mode sfcalc\n")
-    sfcalc_inp.write("sfcalc cr2f\n")
-    if lig:
-        sfcalc_inp.write("make newligand continue\n")
-    sfcalc_inp.write("resolution %f\n" % resol)
-    if bfac is not None and bfac > 0.0:
-        sfcalc_inp.write("temp set %f\n" % bfac)
-    sfcalc_inp.write("source em mb\n")
-    sfcalc_inp.write("make hydrogen yes\n")
-    sfcalc_inp.write("end")
-    sfcalc_inp.close()
-    # Read in sfcalc_inp
-    PATH = filepath + "sfcalc.inp"
-    logf = open(filepath + "sfcalc.log", "w+")
-    if os.path.isfile(PATH) and os.access(PATH, os.R_OK):
-        print("sfcalc.inp exists and is readable")
-        inp = open(filepath + "sfcalc.inp", "r")
-        # Run the command with parameters from file f2mtz.inp
-        subprocess.call(cmd, stdin=inp, stdout=logf)
-        logf.close()
-        inp.close()
-    else:
-        raise SystemExit("File is either missing or not readable")
-    os.chdir(current_path)
 
 
 def read_atomsf(atm, fpath=None):

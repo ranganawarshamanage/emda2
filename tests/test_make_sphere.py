@@ -77,13 +77,13 @@ arr = np.zeros(m1.workarr.shape, dtype=int)
 dx = (nx - mx) // 2
 dy = (ny - my) // 2
 dz = (nz - mz) // 2
-offset = 20 # pixels
+# offset = 20 # pixels
 arr[dx+xoffset_pix:dx+xoffset_pix+mx, 
     dy+yoffset_pix:dy+yoffset_pix+my, 
     dz+zoffset_pix:dz+zoffset_pix+mz] = sphere 
 
 # introduce soft edges
-soft_arr = make_soft(arr, 5)
+soft_arr = make_soft(arr, 3)
 
 # Output mrc file
 

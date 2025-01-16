@@ -38,7 +38,7 @@ def get_map_power(fo, bin_idx, nbin):
     return power_spectrum
 
 
-def get_normalized_sf(fo, bin_idx, nbin):
+def get_normalised_f(fo, bin_idx, nbin):
     """Calculates normalised Fourier coefficients.
     Fourier coefficients are normalised by their radial
     power in bins.
@@ -65,7 +65,7 @@ def get_normalized_sf(fo, bin_idx, nbin):
     return eo
 
 
-def fsc(f1, f2, bin_idx, nbin, fobj=None, xmlobj=None):
+def fsc(f1, f2, bin_idx, nbin):
     """Returns Fourier Shell Correlation (FSC) between any two maps.
 
     Computes Fourier Shell Correlation (FSC) using any two maps.
@@ -86,7 +86,7 @@ def fsc(f1, f2, bin_idx, nbin, fobj=None, xmlobj=None):
     return bin_fsc
 
 
-def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin, filename=None):
+def halfmap_fsc(f_hf1, f_hf2, bin_idx, nbin):
     """Computes Fourier Shell Correlation (FSC) using half maps.
 
     Computes Fourier Shell Correlation (FSC) using half maps.
@@ -274,113 +274,50 @@ def lowpass_map(
     return fmap1, map1
 
 
-def model2map_gm(
-    modelxyz,
-    resol,
-    dim,
-    cell,
-    maporigin=None,
-    outputpath=None,
-    shift_to_boxcenter=False,
+def model2map(
+    input_crdfile, resolution, pad, shift_to_boxcenter, 
+    output_crdfile, density_calculator, bfactor, cell, dims, angpix,
 ):
     """Calculates map from the coordinates
 
     Arguments:
         Inputs:
-            modelxyz: string
+            input_crdfile: string
                 Name of the coordinate file in PDB/CIF
-            resol: float
-                Resolution to which the map to be calculated.
-            dim: list of int
+            resolution: float
+                Desired resolution of the calculated map
+            angpix: float
+                Desired pixel size in Angstroms.
+            dims: list of int
                 Dimension/sampling of the map to be calculated.
                 e.g. dim=[100, 100, 100]
             cell: list of float
                 Unit cell of the map to be calculated in the form
                 [a, b, c, alf, bet, gam]
-            maporigin: list of int, optional
-                Origin of the map to be calculated. default to [0, 0, 0]
-            outputpath: string, optional
-                Path for auxilliary files.
-                default to './emda_gemmifiles'
             shift_to_boxcenter: bool, optional
-                If True, the image/molecule is centered in the box.
+                If True, the molecule is centered in the box.
+            density_calculator: string
+                Either gemmi or refmac
+            bfactor: float
+                Overall B-factor of the map
+            pad: int
+                Padded with this many pixels in each dim
+            output_crdfile: str
+                Final coordinate file for map calculation (mmcif)
 
         Outputs:
-            Returns the model-based map as a 3D numpy array.
+            [modelmap, cell].
     """
+    from emda2.ext.modelmap import density_calculation
 
-    from servalcat.utils.model import calc_fc_fft
-
-    if outputpath is None:
-        outputpath = os.getcwd()
-    outputpath = os.path.join(outputpath, "emda_gemmifiles/")
-    print("outputpath: ", outputpath)
-    # make director for files for refmac run
-    if os.path.exists(outputpath):
-        shutil.rmtree(outputpath)
-    os.mkdir(outputpath)
-    # check for valid sampling:
-    for i in range(3):
-        if dim[i] % 2 != 0:
-            dim[i] += 1
-    # check for minimum sampling
-    min_pix_size = resol / 2  # in Angstrom
-    min_dim = np.asarray(cell[:3], dtype="float") / min_pix_size
-    min_dim = np.ceil(min_dim).astype(int)
-    for i in range(3):
-        if min_dim[i] % 2 != 0:
-            min_dim += 1
-        if min_dim[0] > dim[0]:
-            print("Requested dims: ", dim)
-            print("Minimum dims needed (for requested resolution): ", min_dim)
-            print(
-                "!!! Please lower the requested resolution or increase the"
-                " grid dimensions !!!"
-            )
-            raise SystemExit()
-    if shift_to_boxcenter:
-        from emda.core.modeltools import shift_to_origin, shift_model
-
-        doc = shift_to_origin(modelxyz)
-        doc.write_file(outputpath + "model1.cif")
-        modelxyz = outputpath + "model1.cif"
-    a, b, c = cell[:3]
-    st = gemmi.read_structure(modelxyz)
-    st.spacegroup_hm = "P 1"
-    st.cell.set(a, b, c, 90.0, 90.0, 90.0)
-    st.make_mmcif_document().write_file(outputpath + "model.cif")
-    asu_data = calc_fc_fft(
-        st=st, d_min=resol, source="electron", mott_bethe=True
-    )
-    griddata = asu_data.get_f_phi_on_grid(dim)
-    griddata_np = (np.array(griddata, copy=False)).transpose()
-    modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
-    if np.sum(np.asarray(modelmap.shape, "int") - np.asarray(dim, "int")) != 0:
-        cpix = [cell[i] / shape for i, shape in enumerate(modelmap.shape)]
-        tpix = [cell[i] / shape for i, shape in enumerate(dim)]
-        modelmap = iotools.resample_data(
-            curnt_pix=cpix, targt_pix=tpix, arr=modelmap, targt_dim=dim
-        )
-    if shift_to_boxcenter:
-        maporigin = None  # no origin shift allowed
-        modelmap = np.fft.fftshift(modelmap)  # bring modelmap to boxcenter
-        # shift model to boxcenter
-        doc = shift_model(
-            mmcif_file=outputpath + "model.cif", shift=[a / 2, b / 2, c / 2]
-        )
-        doc.write_file(outputpath + "emda_shifted_model.cif")
-    if maporigin is None:
-        maporigin = [0, 0, 0]
-    else:
-        shift_x = maporigin[0]
-        shift_y = maporigin[1]
-        shift_z = maporigin[2]
-        modelmap = np.roll(
-            np.roll(np.roll(modelmap, -shift_x, axis=0), -shift_y, axis=1),
-            -shift_z,
-            axis=2,
-        )
-    return np.transpose(modelmap)  # it seems the transpose is necessary
+    modelmap, cell = density_calculation(
+        input_crdfile=input_crdfile, resolution=resolution, pad=pad, 
+        shift_to_boxcenter=shift_to_boxcenter, 
+        output_crdfile=output_crdfile, 
+        compute_map_with=density_calculator,
+        bfactor=bfactor, cell=cell, dims=dims,
+        angpix=angpix)
+    return [modelmap, cell]
 
 
 def realsp_correlation(
@@ -628,6 +565,7 @@ def overlay(
     fitres=None,
     r_only=False,
     t_only=False,
+    static_mask=1,
 ):
     from emda2.ext import utils
 
@@ -648,6 +586,7 @@ def overlay(
         emmap1 = overlay.EmmapOverlay(map_list=maplist, nocom=True)
     else:
         emmap1 = overlay.EmmapOverlay(map_list=maplist, nocom=nocom)
+    emmap1.static_mask = static_mask
     emmap1.map_origin = origin
     emmap1.pixsize = pixlist[0]
     emmap1.map_dim = arrlist[0].shape
@@ -928,8 +867,8 @@ def apply_transformation(m1, rotmat=None, trans=None, ibin=None, newdim=None):
 
 
 def rotate_map_realspace(m1, rotmat=None, threshold=None):
-    print("rotamt:")
-    print(rotmat)
+    # print("rotamt:")
+    # print(rotmat)
     if threshold is not None:
         arr = m1.workarr * (m1.workarr > threshold)
     else:

@@ -166,6 +166,12 @@ class Bfgs:
         return ddf
 
     def derivatives(self, x):
+        step = np.asarray(x[3:], "float")
+        self.q = np.array([1.0, 0.0, 0.0, 0.0], "float") + np.insert(
+            step, 0, 0.0
+        )
+        self.q = self.q / np.sqrt(np.dot(self.q, self.q))
+
         # from emda2.ext.overlay import get_dfs
         # rotation derivatives
         nx, ny, nz = self.e0.shape
@@ -220,6 +226,77 @@ class Bfgs:
         # for i in range(6):
         #    print(df[i])
         return df
+    
+    def numeric_derivatives(self, x):
+
+        print(" Use numeric derivative")
+
+        step = np.asarray(x[3:], "float")
+        self.q = np.array([1.0, 0.0, 0.0, 0.0], "float") + np.insert(
+            step, 0, 0.0
+        )
+        self.q = self.q / np.sqrt(np.dot(self.q, self.q))
+        rotmat = quaternions.get_RM(self.q)
+        # ert = maputils.get_FRS(rotmat, self.e1, interp="linear")[:, :, :, 0] # faster, less accurate
+        ert = get_f(self.e1, self.ereal_rgi, self.eimag_rgi, rotmat)  # slower
+        nx, ny, nz = self.e0.shape
+        ert = ert * fcodes2.get_st(nx, ny, nz, x[:3])[0]
+        tpi = 2.0 * np.pi * 1j
+
+        df = np.zeros(6, dtype="float")
+        wgrid = self.wgrid  # 1.0
+        for i in range(3):
+            df[i] = (
+                -np.sum(
+                    np.real(
+                        wgrid
+                        * np.conjugate(self.e0)
+                        * (ert * tpi * self.sv[i, :, :, :])
+                    )
+                )
+            )
+
+        # Numerical derivative using central formula
+        #  nx = 20
+        dq = float(1 / (2 * nx))
+
+        q = self.q + np.array([0, dq, 0, 0], "float") 
+        R_q1f = quaternions.get_RM(q / np.sqrt(np.dot(q, q)))
+
+        q = self.q - np.array([0, dq, 0, 0], "float")
+        R_q1b = quaternions.get_RM(q / np.sqrt(np.dot(q, q)))
+
+        q = self.q + np.array([0, 0, dq, 0], "float")
+        R_q2f = quaternions.get_RM(q / np.sqrt(np.dot(q, q)))
+
+        q = self.q  - np.array([0, 0, dq, 0], "float")
+        R_q2b = quaternions.get_RM(q / np.sqrt(np.dot(q, q)))
+
+        q = self.q + np.array([0, 0, 0, dq], "float")
+        R_q3f = quaternions.get_RM(q / np.sqrt(np.dot(q, q)))
+
+        q = self.q - np.array([0, 0, 0, dq], "float")
+        R_q3b = quaternions.get_RM(q / np.sqrt(np.dot(q, q)))
+
+        nx, ny, nz = self.e0.shape
+
+        dfrs = fcodes2.numberic_derivatives(
+            ert,
+            self.bin_idx,
+            np.stack([R_q1f, R_q1b, R_q2f, R_q2b, R_q3f, R_q3b], axis=0),
+            0,
+            self.nbin,
+            6,
+            nx,
+            ny,
+            nz,
+        )
+        
+        df[3] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(dfrs[0, :, :, :])/(2 * dq)))
+        df[4] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(dfrs[1, :, :, :])/(2 * dq)))
+        df[5] = -np.sum(wgrid * np.real(self.e0 * np.conjugate(dfrs[2, :, :, :])/(2 * dq)))
+
+        return df
 
     def calc_fsc(self):
         assert self.e0.shape == self.e1.shape == self.bin_idx.shape
@@ -257,9 +334,7 @@ class Bfgs:
         self.calc_fsc()
         # print(self.binfsc)
         self.get_wght()
-        fval = np.sum(self.wgrid * self.e0 * np.conjugate(self.ert)) / (
-            nx * ny * nz
-        )  # divide by vol is to scale
+        fval = np.sum(self.wgrid * self.e0 * np.conjugate(self.ert)) #  / (nx * ny * nz)  # divide by vol is to scale
         # print values on display
         rotation = np.arccos((np.trace(rotmat) - 1) / 2) * 180.0 / np.pi
         t_angstrom = self.t * self.pixsize * np.asarray(self.map_dim, "float")
@@ -300,8 +375,8 @@ class Bfgs:
             result = minimize(
                 fun=self.functional,
                 x0=x,
-                method="BFGS",
-                jac=self.derivatives,
+                method="L-BFGS-B",
+                jac=self.numeric_derivatives, #  self.derivatives,
                 tol=tol,
                 # callback=minimize_stopper.__call__,
                 options=options,

@@ -17,7 +17,7 @@ from emda2.ext.utils import (
     cut_resolution_for_linefit,
 )
 from emda2.ext.bfgs import create_xyz_grid
-from emda2.ext.utils import cut_resolution_for_linefit
+from emda2.ext.utils import cut_resolution_for_linefit, rotate_f
 from scipy.optimize import minimize_scalar
 
 # from emda2.ext.bfgs import get_rgi, get_f
@@ -461,7 +461,7 @@ class linefit:
         q = tmp + self.q_init  # self.q_prev
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
-        ers = get_FRS(rotmat, self.e1, interp="linear")
+        ers = rotate_f(rotmat, self.e1, interp="linear")
         w_grid = self.get_fsc_wght(
             self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin
         )
@@ -540,7 +540,7 @@ class ndlinefit:
         q = tmp + self.q_init
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
-        ers = maputils.get_FRS(rotmat, self.e1, interp="linear")
+        ers = rotate_f(rotmat, self.e1, interp="linear")
         # w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)
         # fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0])))
         fval = np.real(np.sum(self.e0 * np.conjugate(ers[:, :, :, 0])))

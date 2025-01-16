@@ -30,6 +30,7 @@ from emda2.ext.utils import (
 )
 from scipy.ndimage.interpolation import shift
 import fcodes2
+import emda2.core.fft as fft
 
 
 class EmmapOverlay:
@@ -73,37 +74,40 @@ class EmmapOverlay:
         self._check_inputs()
         for i, arr in enumerate(self.map_list):
             if self.com:
-                print("Calculating COM...")
-                com1 = maptools.center_of_mass_density(arr)
-                if i == 0:
-                    box_centr = (
-                        arr.shape[0] // 2,
-                        arr.shape[1] // 2,
-                        arr.shape[2] // 2,
-                    )
-                    self.com1, self.box_centr = com1, box_centr
-                self.comlist.append(com1)
-                arr_mvd = shift(arr, np.subtract(box_centr, com1))
-                self.arr_lst.append(arr_mvd)
-                self.fhf_lst.append(fftshift(fftn(fftshift(arr_mvd))))
-                outputname = "startmap_%s.mrc" % str(i)
-                stmap = iotools.Map(outputname)
-                stmap.arr = arr_mvd
-                stmap.cell = self.map_unit_cell
-                stmap.origin = self.map_origin
-                stmap.write()
+                self._process_map_with_com(arr, i)
             else:
-                self.fhf_lst.append(fftshift(fftn(fftshift(arr))))
+                self.fhf_lst.append(fft.to_f(arr))
+
+    def _process_map_with_com(self, arr, index):
+        print("Calculating COM...")
+        com1 = maptools.center_of_mass_density(arr)
+        if index == 0:
+            box_centr = (
+                arr.shape[0] // 2,
+                arr.shape[1] // 2,
+                arr.shape[2] // 2,
+            )
+            self.com1, self.box_centr = com1, box_centr
+        self.comlist.append(com1)
+        arr_mvd = shift(arr, np.subtract(self.box_centr, com1))
+        self.arr_lst.append(arr_mvd)
+        self.fhf_lst.append(fft.to_f(arr_mvd))
+        self._save_start_map(arr_mvd, index)
+
+    def _save_start_map(self, arr, index):
+        outputname = f"startmap_{index}.mrc"
+        stmap = iotools.Map(outputname)
+        stmap.arr = arr
+        stmap.cell = self.map_unit_cell
+        stmap.origin = self.map_origin
+        stmap.write()
 
     def calc_fsc_from_maps(self):
-        # function for only two maps fitting
         nmaps = len(self.fhf_lst)
         print("nmaps: ", nmaps)
-        (
-            self.nbin,
-            self.res_arr,
-            self.bin_idx,
-        ) = restools.get_resolution_array(self.map_unit_cell, self.fhf_lst[0])
+        self.nbin, self.res_arr, self.bin_idx, _ = restools.get_resolution_array(
+            self.map_unit_cell, self.fhf_lst[0]
+        )
         for i in range(nmaps):
             _, _, _, totalvar, fo, eo = fsctools.halfmaps_fsc_variance(
                 self.fhf_lst[i], self.fhf_lst[i], self.bin_idx, self.nbin
@@ -350,21 +354,23 @@ def run_fit(
             ibin = np.argmin(dist)
             if emmap1.res_arr[ibin] < fitres:
                 ibin = ibin - 1
-            print("chosen resolution: ", emmap1.res_arr[ibin])
             if ibin % 2 != 0:
                 ibin = ibin - 1
             fitbin = min([len(dist), ibin])
     else:
         fitbin = len(emmap1.res_arr) - 1
-    fsc_lst = []
-    # com difference
-    comshift = np.array([0.0, 0.0, 0.0], "float")
+    print("Chosen resolution for fitting: ", emmap1.res_arr[fitbin])
+
     if len(emmap1.comlist) > 0:
         comshift = (
             np.subtract(emmap1.comlist[ifit], emmap1.comlist[0])
             * emmap1.pixsize
         )
+    else:
+        comshift = np.array([0.0, 0.0, 0.0], "float")
+
     q = quaternions.rot2quart(rotmat)
+    fsc_lst = []
     for i in range(10):
         print("Resolution cycle #: ", i)
         if i == 0:
@@ -419,7 +425,39 @@ def run_fit(
                 t=t,
                 nbin=emmap1.nbin,
             )
-            ibin = determine_ibin(f1f2_fsc)
+
+            # ibin = determine_ibin(f1f2_fsc)
+
+            # Here calculate FSC using the mask for static map
+            # That may help to improve the fit (reduce effect of aliasing)
+            static_map = np.real(
+                np.fft.ifftshift(
+                    np.fft.ifftn(
+                        np.fft.ifftshift(emmap1.fo_lst[0])
+                        )
+                    )
+                )
+            static_mask = static_map > (np.amax(static_map) * 0.1)
+            fitted_map = np.real(
+                    np.fft.ifftshift(
+                        np.fft.ifftn(
+                            np.fft.ifftshift(frt)
+                        )
+                    )
+                )
+            f_masked = fftshift(fftn(fftshift(fitted_map * static_mask)))
+            binfsc_masked, _, _ = fsctools.anytwomaps_fsc_covariance(
+                emmap1.fo_lst[0], 
+                f_masked,
+                emmap1.bin_idx, 
+                emmap1.nbin,
+            )
+            ert = f_masked
+            frt = f_masked
+
+            ibin = determine_ibin(binfsc_masked)
+            f1f2_fsc = binfsc_masked
+
             if ibin == 0:
                 print("ibin = 0, Cannot proceed! Stopping now...")
                 return None
@@ -440,14 +478,14 @@ def run_fit(
                         )
                     )
                 # output fitted_map
-                static_map = np.real(
+                """ static_map = np.real(
                     np.fft.ifftshift(
                         np.fft.ifftn(np.fft.ifftshift(emmap1.fo_lst[0]))
                     )
                 )
                 fitted_map = np.real(
                     np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(frt)))
-                )
+                ) * static_mask """
                 mo = iotools.Map("fitted_map.mrc")
                 mo.arr = fitted_map
                 mo.cell = emmap1.map_unit_cell
